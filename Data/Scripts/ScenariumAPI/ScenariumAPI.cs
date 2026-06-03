@@ -1,13 +1,10 @@
 using Sandbox.ModAPI;
 using Sandbox.Game;
 using VRage.Game.Components;
-using VRage.Game.ModAPI;
 using VRage.Utils;
-using VRageMath;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Xml.Serialization;
 using System.IO;
 
 namespace ScenariumAPI
@@ -23,8 +20,7 @@ namespace ScenariumAPI
         public override void LoadData()
         {
             _data = LoadState();
-            if (_data == null)
-                _data = ScenariumSaveData.CreateDefault();
+            if (_data == null) _data = ScenariumSaveData.CreateDefault();
         }
 
         protected override void UnloadData()
@@ -40,30 +36,26 @@ namespace ScenariumAPI
             {
                 _initialized = true;
                 MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
-                Notify("ScenariumAPI loaded. Type /scen help for commands.");
+                Notify("ScenariumAPI v0.1.1 loaded. Type /scen help for commands.");
             }
-
             _tick++;
-            if (_tick % 3600 == 0)
-                SaveState();
+            if (_tick % 3600 == 0) SaveState();
         }
 
         void OnMessageEntered(string messageText, ref bool sendToOthers)
         {
             if (string.IsNullOrWhiteSpace(messageText)) return;
             if (!messageText.StartsWith("/scen", StringComparison.OrdinalIgnoreCase)) return;
-
             sendToOthers = false;
             var args = messageText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             if (args.Length == 1 || Eq(args[1], "help")) { ShowHelp(); return; }
             if (Eq(args[1], "status")) { ShowStatus(); return; }
-            if (Eq(args[1], "quest")) { ShowQuestMenu(); return; }
-            if (Eq(args[1], "menu")) { ShowQuestMenu(); return; }
+            if (Eq(args[1], "quest") || Eq(args[1], "menu")) { ShowQuestMenu(); return; }
             if (Eq(args[1], "complete") && args.Length >= 3) { CompleteQuest(args[2]); return; }
             if (Eq(args[1], "reset")) { _data = ScenariumSaveData.CreateDefault(); SaveState(); Notify("ScenariumAPI state reset."); return; }
             if (Eq(args[1], "save")) { SaveState(); Notify("ScenariumAPI state saved."); return; }
             if (Eq(args[1], "war") && args.Length >= 3) { SetFactionWarState(args[2]); return; }
-
+            if (Eq(args[1], "debug")) { ShowDebug(); return; }
             Notify("Unknown command. Type /scen help.");
         }
 
@@ -74,9 +66,10 @@ namespace ScenariumAPI
             var sb = new StringBuilder();
             sb.AppendLine("ScenariumAPI Commands");
             sb.AppendLine("/scen status - show campaign status");
-            sb.AppendLine("/scen quest  - show quest menu scaffold");
+            sb.AppendLine("/scen quest - show quest menu scaffold");
             sb.AppendLine("/scen complete <questId> - mark quest complete");
             sb.AppendLine("/scen war <factionTag> - set faction to War state");
+            sb.AppendLine("/scen debug - show save diagnostics");
             sb.AppendLine("/scen save - save state");
             sb.AppendLine("/scen reset - reset demo state");
             Dialog("ScenariumAPI Help", sb.ToString());
@@ -97,8 +90,6 @@ namespace ScenariumAPI
 
         void ShowQuestMenu()
         {
-            // This is intentionally a vanilla-safe quest menu for first-load testing.
-            // Next pass can replace this with RichHudText/RichHudFramework UI calls once dependency wiring is confirmed.
             var sb = new StringBuilder();
             sb.AppendLine("SOLARWAR - QUEST MENU");
             sb.AppendLine("Sector: " + _data.CurrentSector);
@@ -111,9 +102,21 @@ namespace ScenariumAPI
                 if (q.Revealed || q.Completed)
                     sb.AppendLine(mark + " " + q.Id + " - " + q.Title + " :: " + q.Description);
             }
-            sb.AppendLine();
-            sb.AppendLine("RichHudText integration target: replace this dialog with persistent quest panel.");
             Dialog("ScenariumAPI Quest Menu", sb.ToString());
+        }
+
+        void ShowDebug()
+        {
+            bool exists = false;
+            try { exists = MyAPIGateway.Utilities.FileExistsInWorldStorage(SaveFile, typeof(ScenariumSession)); } catch {}
+            var sb = new StringBuilder();
+            sb.AppendLine("ScenariumAPI Debug");
+            sb.AppendLine("Version: 0.1.1 Sandbox Safe");
+            sb.AppendLine("SaveFile: " + SaveFile);
+            sb.AppendLine("SaveExists: " + exists);
+            sb.AppendLine("QuestCount: " + (_data == null || _data.Quests == null ? 0 : _data.Quests.Count));
+            sb.AppendLine("FactionCount: " + (_data == null || _data.Factions == null ? 0 : _data.Factions.Count));
+            Dialog("ScenariumAPI Debug", sb.ToString());
         }
 
         void CompleteQuest(string id)
@@ -122,8 +125,7 @@ namespace ScenariumAPI
             {
                 if (Eq(q.Id, id))
                 {
-                    q.Completed = true;
-                    q.Revealed = true;
+                    q.Completed = true; q.Revealed = true;
                     Notify("Quest completed: " + q.Title);
                     ApplyDemoQuestChain(id);
                     SaveState();
@@ -140,9 +142,7 @@ namespace ScenariumAPI
             if (Eq(id, "UTD_HQ"))
             {
                 foreach (var f in _data.Factions)
-                {
                     if (Eq(f.Tag, "UTD")) { f.State = "Defeated"; f.Defeated = true; }
-                }
                 RevealQuest("GATE_ALPHA_COMPONENT");
             }
         }
@@ -150,14 +150,7 @@ namespace ScenariumAPI
         void RevealQuest(string id)
         {
             foreach (var q in _data.Quests)
-            {
-                if (Eq(q.Id, id))
-                {
-                    q.Revealed = true;
-                    Notify("New objective revealed: " + q.Title);
-                    return;
-                }
-            }
+                if (Eq(q.Id, id)) { q.Revealed = true; Notify("New objective revealed: " + q.Title); return; }
         }
 
         void SetFactionWarState(string tag)
@@ -166,10 +159,7 @@ namespace ScenariumAPI
             {
                 if (Eq(f.Tag, tag))
                 {
-                    f.State = "War";
-                    Notify(tag + " state set to War.");
-                    SaveState();
-                    return;
+                    f.State = "War"; Notify(tag + " state set to War."); SaveState(); return;
                 }
             }
             _data.Factions.Add(new ScenariumFactionState { Tag = tag.ToUpperInvariant(), State = "War", Defeated = false });
@@ -181,12 +171,17 @@ namespace ScenariumAPI
         {
             try
             {
+                if (MyAPIGateway.Utilities == null) return null;
                 if (!MyAPIGateway.Utilities.FileExistsInWorldStorage(SaveFile, typeof(ScenariumSession))) return null;
                 TextReader reader = MyAPIGateway.Utilities.ReadFileInWorldStorage(SaveFile, typeof(ScenariumSession));
-                var xml = reader.ReadToEnd();
+                string xml = reader.ReadToEnd();
                 reader.Close();
-                var serializer = new XmlSerializer(typeof(ScenariumSaveData));
-                using (var sr = new StringReader(xml)) return serializer.Deserialize(sr) as ScenariumSaveData;
+                if (string.IsNullOrWhiteSpace(xml)) return null;
+                var data = MyAPIGateway.Utilities.SerializeFromXML<ScenariumSaveData>(xml);
+                if (data == null) return null;
+                if (data.Quests == null) data.Quests = new List<ScenariumQuestState>();
+                if (data.Factions == null) data.Factions = new List<ScenariumFactionState>();
+                return data;
             }
             catch (Exception e)
             {
@@ -199,14 +194,11 @@ namespace ScenariumAPI
         {
             try
             {
-                var serializer = new XmlSerializer(typeof(ScenariumSaveData));
-                using (var sw = new StringWriter())
-                {
-                    serializer.Serialize(sw, _data);
-                    TextWriter writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(SaveFile, typeof(ScenariumSession));
-                    writer.Write(sw.ToString());
-                    writer.Close();
-                }
+                if (MyAPIGateway.Utilities == null || _data == null) return;
+                string xml = MyAPIGateway.Utilities.SerializeToXML(_data);
+                TextWriter writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(SaveFile, typeof(ScenariumSession));
+                writer.Write(xml);
+                writer.Close();
             }
             catch (Exception e)
             {
@@ -214,15 +206,8 @@ namespace ScenariumAPI
             }
         }
 
-        void Notify(string text)
-        {
-            MyAPIGateway.Utilities.ShowNotification(text, 5000, MyFontEnum.Green);
-        }
-
-        void Dialog(string title, string body)
-        {
-            MyAPIGateway.Utilities.ShowMissionScreen(title, "", "", body, null, "Close");
-        }
+        void Notify(string text) { MyAPIGateway.Utilities.ShowNotification(text, 5000, MyFontEnum.Green); }
+        void Dialog(string title, string body) { MyAPIGateway.Utilities.ShowMissionScreen(title, "", "", body, null, "Close"); }
     }
 
     public class ScenariumSaveData
