@@ -54,8 +54,7 @@ namespace ScenariumAPI.Diagnostics
 
             sb.AppendLine("");
             sb.AppendLine("WORLD FACTS");
-            foreach (var fact in runtime.State.WorldState)
-                sb.AppendLine(fact.Key + "=" + fact.Value);
+            sb.AppendLine("WorldState data object present: " + (runtime.State.WorldState != null));
 
             return sb.ToString();
         }
