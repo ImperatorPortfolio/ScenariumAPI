@@ -139,8 +139,8 @@ namespace ScenariumAPI
             _sideBoxD = Box(_sidePanel, new Vector2(290f, 60f), new Vector2(0f,  -52f), CardColor, 12);
 
             // Title bar labels
-            _title     = Label(_titleBar, "SCENARIUM",                  new Vector2(-438f,  10f), new Vector2(360f, 32f), AccentColor,    1.08f, TextAlignment.Left,   13);
-            _subTitle  = Label(_titleBar, "Campaign Control Interface", new Vector2(-438f, -14f), new Vector2(440f, 22f), MutedTextColor, 0.66f, TextAlignment.Left,   13);
+            _title     = Label(_titleBar, "SCENARIUM",                  new Vector2(-496f,  10f), new Vector2(360f, 32f), AccentColor,    1.08f, TextAlignment.Left,   13);
+            _subTitle  = Label(_titleBar, "Campaign Control Interface", new Vector2(-496f, -14f), new Vector2(440f, 22f), MutedTextColor, 0.66f, TextAlignment.Left,   13);
             _closeButton = Button(_titleBar, "✕", new Vector2(578f, 0f), new Vector2(36f, 36f), CloseColor, CloseHoverColor, 13);
             _closeButton.MouseInput.LeftClicked += delegate { Close(); _addEvent("Scenarium panel closed."); _save(); };
 
@@ -151,31 +151,31 @@ namespace ScenariumAPI
             _tabIntel    = TabButton("INTEL LOG",  420f, "INTEL");
 
             // Sidebar nav
-            _sideTitle     = Label(_sidePanel, "NAVIGATION", new Vector2(0f, 258f), new Vector2(300f, 30f), AccentDimColor, 0.78f, TextAlignment.Center, 13);
+            _sideTitle     = Label(_sidePanel, "NAVIGATION", new Vector2(0f, 256f), new Vector2(290f, 30f), AccentDimColor, 0.82f, TextAlignment.Center, 13);
             _sideOverview  = SideButton("Overview",  176f, "OVERVIEW");
             _sidePrimary   = SideButton("Primary",   100f, "PRIMARY");
             _sideSecondary = SideButton("Secondary",  24f, "SECONDARY");
             _sideTertiary  = SideButton("Details",   -52f, "TERTIARY");
 
             // Summary card
-            _summaryTitle = Label(_summaryBox, "SUMMARY", new Vector2(0f,  40f), new Vector2(710f, 24f), AccentDimColor, 0.78f, TextAlignment.Left, 13);
-            _summaryBody  = Label(_summaryBox, "",         new Vector2(  0f, -12f), new Vector2(700f, 76f), TextColor,      0.84f, TextAlignment.Left, 13);
+            _summaryTitle = Label(_summaryBox, "SUMMARY", new Vector2(-358f,  40f), new Vector2(260f, 24f), AccentDimColor, 0.80f, TextAlignment.Left, 13);
+            _summaryBody  = Label(_summaryBox, "",         new Vector2(  0f, -12f), new Vector2(730f, 76f), TextColor,      0.86f, TextAlignment.Left, 13);
             _summaryBody.VertCenterText = false;
 
             // Detail card
             _detailTitle = Label(_detailBox, "DETAILS", new Vector2(-358f, 150f), new Vector2(220f, 20f), AccentDimColor, 0.58f, TextAlignment.Left,  13);
-            _detailBody  = Label(_detailBox, "",         new Vector2(  0f, -12f), new Vector2(700f, 292f), TextColor,     0.80f, TextAlignment.Left,  13);
+            _detailBody  = Label(_detailBox, "",         new Vector2(  0f, -12f), new Vector2(730f, 292f), TextColor,     0.82f, TextAlignment.Left,  13);
             _detailBody.VertCenterText = false;
-            _detailBody.LineWrapWidth = 680f;
+            _detailBody.LineWrapWidth = 700f;
 
             // Activity card
-            _activityTitle = Label(_activityBox, "RECENT ACTIVITY", new Vector2(0f, 32f), new Vector2(710f, 24f), AccentDimColor, 0.74f, TextAlignment.Left, 13);
-            _activityBody  = Label(_activityBox, "",                  new Vector2(  0f, -18f), new Vector2(700f, 62f), TextColor,     0.74f, TextAlignment.Left, 13);
+            _activityTitle = Label(_activityBox, "RECENT ACTIVITY", new Vector2(-358f, 32f), new Vector2(320f, 24f), AccentDimColor, 0.78f, TextAlignment.Left, 13);
+            _activityBody  = Label(_activityBox, "",                  new Vector2(  0f, -18f), new Vector2(730f, 62f), TextColor,     0.76f, TextAlignment.Left, 13);
             _activityBody.VertCenterText = false;
-            _activityBody.LineWrapWidth = 680f;
+            _activityBody.LineWrapWidth = 700f;
 
             // Status bar
-            _status = Label(_statusBar, "SHIFT+Q  Open / Close   |   Click tabs and sidebar cards to navigate", new Vector2(0f, 0f), new Vector2(1120f, 30f), MutedTextColor, 0.72f, TextAlignment.Left, 13);
+            _status = Label(_statusBar, "SHIFT+Q  Open / Close   |   Click tabs and sidebar cards to navigate", new Vector2(-556f, 0f), new Vector2(1100f, 30f), MutedTextColor, 0.72f, TextAlignment.Left, 13);
 
             _created = true;
             HudMain.EnableCursor = _data.PanelVisible;
@@ -245,17 +245,9 @@ namespace ScenariumAPI
 
         LabelBoxButton SideButton(string text, float y, string id)
         {
-            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(290f, 54f), CardColor, ButtonHoverColor, 18);
-            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Left, 0.68f));
-            button.MouseInput.RequestCursor = true;
-
-            button.MouseInput.LeftClicked += delegate
-            {
-                _data.SelectedItemId = id;
-                Refresh(true);
-                _save();
-            };
-
+            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(290f, 60f), CardColor, ButtonHoverColor, 14);
+            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Left, 0.86f));
+            button.Offset = new Vector2(10f, y);
             return button;
         }
 
@@ -385,20 +377,16 @@ namespace ScenariumAPI
             if (button != null)
             {
                 button.Color = bg;
-                button.TextBoard.SetFormatting(new GlyphFormat(fg, TextAlignment.Left, 0.68f));
+                button.TextBoard.SetFormatting(new GlyphFormat(fg, TextAlignment.Left, 0.86f));
             }
-
-            if (box != null)
-                box.Color = CardColor;
-        }
             if (box != null)
                 box.Color = bg;
         }
 
         void PopulateContent()
         {
-            _summaryTitle.Text  = "SUMMARY";
-            _detailTitle.Text   = PrettyTab(_data.PanelTab).ToUpper() + "  •  " + FormatSelection(_data.SelectedItemId).ToUpper();
+            _summaryTitle.Text  = PrettyTab(_data.PanelTab).ToUpper() + " — SUMMARY";
+            _detailTitle.Text   = PrettyTab(_data.PanelTab).ToUpper() + " / " + FormatSelection(_data.SelectedItemId).ToUpper();
             _activityTitle.Text = "RECENT ACTIVITY";
 
             if (_data.PanelTab == "SCENARIO") PopulateScenario();
