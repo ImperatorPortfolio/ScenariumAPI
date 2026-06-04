@@ -12,6 +12,9 @@ using ScenariumAPI.Data;
 using ScenariumAPI.Persistence;
 using ScenariumAPI.Api;
 using ScenariumAPI.Integrations.MES;
+using ScenariumAPI.Events;
+using ScenariumAPI.Diagnostics;
+using ScenariumAPI.Progression;
 
 namespace ScenariumAPI
 {
@@ -34,6 +37,10 @@ namespace ScenariumAPI
         MesBindingBridge _mesBridge;
         MesPermissionExporter _mesExporter;
         ScenariumDataValidationResult _lastValidation;
+        ScenariumEventBus _eventBus;
+        ScenariumDiagnostics _diagnostics;
+        ConquestConsequenceRuntime _consequences;
+        CampaignBindingValidator _bindingValidator;
         bool _ignorePersistedRuntimeStateOnce;
 
         public override void LoadData()
@@ -46,12 +53,18 @@ namespace ScenariumAPI
 
             _loader = new CampaignPackLoader();
             _validator = new CampaignValidator();
+            _eventBus = new ScenariumEventBus(AddEvent);
+            _diagnostics = new ScenariumDiagnostics();
             _runtime = new CampaignRuntime(AddEvent);
             _runtimePersistence = new ScenariumPersistence();
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
+            _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
+            _bindingValidator = new CampaignBindingValidator();
+            _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
+            _bindingValidator = new CampaignBindingValidator();
 
             _hud = new ScenariumHUD(_data, AddEvent, SaveState);
         }
@@ -165,6 +178,77 @@ namespace ScenariumAPI
                 _hud.Open();
 
                 ValidateCampaign();
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "events"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddMultilineEvent(_eventBus != null ? _eventBus.BuildRecentSummary(20) : "Event bus is not initialized.");
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "facts"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddMultilineEvent(_diagnostics != null ? _diagnostics.BuildFactsReport(_runtime) : "Diagnostics are not initialized.");
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "diagnose"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddMultilineEvent(_diagnostics != null ? _diagnostics.BuildRuntimeReport(_runtime, _mesBridge) : "Diagnostics are not initialized.");
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "bindings") && args.Length >= 3 && Eq(args[2], "validate"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddMultilineEvent(_bindingValidator != null ? _bindingValidator.ValidateMesBindings(_runtime) : "Binding validator is not initialized.");
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "transition") && args.Length >= 5 && Eq(args[2], "node"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                if (Eq(args[4], "destroyed") || Eq(args[4], "destroy"))
+                    DestroyNode(args[3]);
+                else if (Eq(args[4], "captured") || Eq(args[4], "capture"))
+                    CaptureNode(args[3]);
+                else
+                    AddEvent("Transition usage: /scen transition node <nodeId> destroyed|captured");
+
                 SaveState();
                 _hud.Refresh(true);
                 return;
@@ -372,6 +456,9 @@ namespace ScenariumAPI
                 if (_mesExporter != null)
                     _mesExporter.Export(_mesBridge.Snapshot);
 
+            if (_eventBus != null)
+                _eventBus.Publish(ScenariumEventType.CampaignLoaded, campaign.CampaignId, "Campaign loaded.", "", campaign.InitialState.ToString());
+
             AddEvent("Campaign reloaded: " + campaign.DisplayName);
             AddEvent("Scenarios: " + campaign.Scenarios.Count + " | Factions: " + campaign.Factions.Count + " | Nodes: " + campaign.ConquestNodes.Count);
             if (_lastValidation != null)
@@ -426,7 +513,10 @@ namespace ScenariumAPI
                 return;
             }
 
-            _runtime.DestroyNode(nodeId);
+            if (_consequences != null)
+                _consequences.DestroyNode(nodeId);
+            else
+                _runtime.DestroyNode(nodeId);
         }
 
         void CaptureNode(string nodeId)
@@ -437,7 +527,10 @@ namespace ScenariumAPI
                 return;
             }
 
-            _runtime.CaptureNode(nodeId);
+            if (_consequences != null)
+                _consequences.CaptureNode(nodeId);
+            else
+                _runtime.CaptureNode(nodeId);
         }
 
 
@@ -651,11 +744,20 @@ namespace ScenariumAPI
             _data.PanelTab = "SCENARIO";
             _data.SelectedItemId = "OVERVIEW";
 
+            _eventBus = new ScenariumEventBus(AddEvent);
+            _diagnostics = new ScenariumDiagnostics();
+            if (_eventBus != null)
+                _eventBus.Clear();
+
             _runtime = new CampaignRuntime(AddEvent);
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
+            _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
+            _bindingValidator = new CampaignBindingValidator();
+            _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
+            _bindingValidator = new CampaignBindingValidator();
 
             _ignorePersistedRuntimeStateOnce = true;
 
