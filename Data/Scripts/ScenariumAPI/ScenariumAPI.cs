@@ -44,8 +44,8 @@ namespace ScenariumAPI
         CampaignBindingValidator _bindingValidator;
         NodeTransitionValidator _transitionValidator;
         TransitionAuditLog _transitionAudit;
-        ScenariumNodeBindingRuntime _nodeBinding;
         bool _ignorePersistedRuntimeStateOnce;
+        ScenariumEntityBindingRuntime _entityBinding;
 
         public override void LoadData()
         {
@@ -63,22 +63,20 @@ namespace ScenariumAPI
             _runtimePersistence = new ScenariumPersistence();
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
+            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
-            _nodeBinding = new ScenariumNodeBindingRuntime(RunValidatedNodeTransition, AddEvent);
-            _nodeBinding = new ScenariumNodeBindingRuntime(RunValidatedNodeTransition, AddEvent);
+            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
-            _nodeBinding = new ScenariumNodeBindingRuntime(RunValidatedNodeTransition, AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
-            _nodeBinding = new ScenariumNodeBindingRuntime(RunValidatedNodeTransition, AddEvent);
 
             _hud = new ScenariumHUD(_data, AddEvent, SaveState);
         }
@@ -120,9 +118,9 @@ namespace ScenariumAPI
 
             HandleKeyboardInput();
 
-            if (_nodeBinding != null && _tick % 120 == 0)
+            if (_entityBinding != null && _tick % 120 == 0)
             {
-                _nodeBinding.Update();
+                _entityBinding.Update();
                 UpdateHudViewModel();
             }
 
@@ -210,7 +208,7 @@ namespace ScenariumAPI
                 _data.SelectedItemId = "OVERVIEW";
                 _hud.Open();
 
-                HandleBindCommand(args);
+                HandlePersistentBindCommand(args);
 
                 SaveState();
                 _hud.Refresh(true);
@@ -648,37 +646,47 @@ namespace ScenariumAPI
 
 
 
-        void HandleBindCommand(string[] args)
+        void HandlePersistentBindCommand(string[] args)
         {
-            if (_nodeBinding == null)
-                _nodeBinding = new ScenariumNodeBindingRuntime(RunValidatedNodeTransition, AddEvent);
+            if (_entityBinding == null)
+                _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
 
             if (args.Length == 2 || Eq(args[2], "diagnose"))
             {
-                AddMultilineEvent(_nodeBinding.BuildDiagnostics());
+                AddMultilineEvent(_entityBinding.BuildDiagnostics());
                 return;
             }
 
             if (Eq(args[2], "scan"))
             {
-                _nodeBinding.Scan();
-                AddMultilineEvent(_nodeBinding.BuildTrackedSummary());
+                _entityBinding.ScanByCampaignBindings();
+                AddMultilineEvent(_entityBinding.BuildSummary());
                 return;
             }
 
-            if (Eq(args[2], "tracked"))
+            if (Eq(args[2], "entities") || Eq(args[2], "tracked"))
             {
-                AddMultilineEvent(_nodeBinding.BuildTrackedSummary());
+                AddMultilineEvent(_entityBinding.BuildSummary());
                 return;
             }
 
             if (Eq(args[2], "clear"))
             {
-                _nodeBinding.Clear();
+                _entityBinding.Clear();
                 return;
             }
 
-            AddEvent("Bind commands: /scen bind scan | tracked | diagnose | clear");
+            if (Eq(args[2], "unbind") && args.Length >= 4)
+            {
+                long entityId;
+                if (long.TryParse(args[3], out entityId))
+                    _entityBinding.Unbind(entityId);
+                else
+                    AddEvent("Invalid entity id: " + args[3]);
+                return;
+            }
+
+            AddEvent("Bind commands: /scen bind scan | entities | diagnose | clear | unbind <entityId>");
         }
 
         void RunValidatedNodeTransition(string nodeId, string transition, bool force)
@@ -887,18 +895,17 @@ namespace ScenariumAPI
             _runtime = new CampaignRuntime(AddEvent);
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
+            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
-            _nodeBinding = new ScenariumNodeBindingRuntime(RunValidatedNodeTransition, AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
-            _nodeBinding = new ScenariumNodeBindingRuntime(RunValidatedNodeTransition, AddEvent);
 
             _ignorePersistedRuntimeStateOnce = true;
 
