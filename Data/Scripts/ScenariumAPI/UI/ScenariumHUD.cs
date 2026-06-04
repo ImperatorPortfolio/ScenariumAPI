@@ -61,41 +61,41 @@ namespace ScenariumAPI
         void HudInit()
         {
             _root = new TexturedBox(HudMain.HighDpiRoot);
-            _root.Size = new Vector2(1180f, 760f);
+            _root.Size = new Vector2(1220f, 780f);
             _root.Offset = new Vector2(0f, 0f);
-            _root.Color = new Color(4, 9, 15, 238);
+            _root.Color = new Color(18, 30, 38, 205);
             _root.Visible = _data.PanelVisible;
-            _root.ZOffset = 10;
+            _root.ZOffset = (sbyte)10;
 
-            _titleBar = Box(_root, new Vector2(1180f, 64f), new Vector2(0f, 348f), new Color(0, 40, 58, 250), 11);
-            _tabBar = Box(_root, new Vector2(1180f, 56f), new Vector2(0f, 288f), new Color(7, 18, 29, 246), 11);
-            _sidePanel = Box(_root, new Vector2(310f, 585f), new Vector2(-415f, -28f), new Color(8, 14, 22, 245), 11);
-            _mainPanel = Box(_root, new Vector2(810f, 585f), new Vector2(170f, -28f), new Color(10, 17, 27, 245), 11);
-            _statusBar = Box(_root, new Vector2(1180f, 48f), new Vector2(0f, -356f), new Color(0, 35, 48, 240), 11);
+            _titleBar = Box(_root, new Vector2(1220f, 58f), new Vector2(0f, 352f), new Color(30, 48, 58, 225), 11);
+            _tabBar = Box(_root, new Vector2(1220f, 54f), new Vector2(0f, 294f), new Color(24, 39, 49, 215), 11);
+            _sidePanel = Box(_root, new Vector2(330f, 590f), new Vector2(-420f, -22f), new Color(20, 34, 43, 205), 11);
+            _mainPanel = Box(_root, new Vector2(800f, 590f), new Vector2(190f, -22f), new Color(18, 30, 39, 195), 11);
+            _statusBar = Box(_root, new Vector2(1220f, 44f), new Vector2(0f, -363f), new Color(24, 39, 49, 220), 11);
 
-            _title = Label(_titleBar, "SCENARIO", new Vector2(-515f, 0f), new Vector2(360f, 44f), new Color(0, 220, 255, 255), 1.25f, TextAlignment.Left, 12);
-            _closeButton = Button(_titleBar, "X", new Vector2(548f, 0f), new Vector2(42f, 38f), new Color(75, 15, 20, 255), new Color(140, 35, 45, 255), 12);
+            _title = Label(_titleBar, "Scenarium", new Vector2(0f, 0f), new Vector2(500f, 40f), new Color(220, 235, 242, 255), 1.12f, TextAlignment.Center, 12);
+            _closeButton = Button(_titleBar, "X", new Vector2(565f, 0f), new Vector2(40f, 36f), new Color(42, 57, 67, 235), new Color(85, 105, 115, 255), 12);
             _closeButton.MouseInput.LeftClicked += delegate { Close(); _addEvent("Scenarium panel closed."); _save(); };
 
             _tabScenario = TabButton("Scenario", -420f, "SCENARIO");
-            _tabQuests = TabButton("Quests", -145f, "QUESTS");
-            _tabFactions = TabButton("Faction States", 145f, "FACTIONS");
+            _tabQuests = TabButton("Quests", -140f, "QUESTS");
+            _tabFactions = TabButton("Factions", 140f, "FACTIONS");
             _tabIntel = TabButton("Intel Log", 420f, "INTEL");
 
-            _sideTitle = Label(_sidePanel, "OVERVIEW", new Vector2(0f, 252f), new Vector2(270f, 34f), new Color(0, 220, 255, 255), 0.8f, TextAlignment.Center, 12);
-            _sideOverview = SideButton("Overview", 190f, "OVERVIEW");
-            _sidePrimary = SideButton("Active Objective", 130f, "PRIMARY");
-            _sideSecondary = SideButton("Progression", 70f, "SECONDARY");
-            _sideTertiary = SideButton("Details", 10f, "TERTIARY");
+            _sideTitle = Label(_sidePanel, "Overview", new Vector2(0f, 252f), new Vector2(280f, 34f), new Color(220, 235, 242, 255), 0.88f, TextAlignment.Center, 12);
+            _sideOverview = SideButton("Overview", 185f, "OVERVIEW");
+            _sidePrimary = SideButton("Active Objective", 115f, "PRIMARY");
+            _sideSecondary = SideButton("Progression", 45f, "SECONDARY");
+            _sideTertiary = SideButton("Details", -25f, "TERTIARY");
 
-            _mainTitle = Label(_mainPanel, "DETAIL", new Vector2(0f, 252f), new Vector2(760f, 34f), new Color(0, 220, 255, 255), 0.85f, TextAlignment.Left, 12);
-            _mainBody = Label(_mainPanel, "", new Vector2(0f, -28f), new Vector2(760f, 500f), new Color(235, 240, 245, 255), 0.72f, TextAlignment.Left, 12);
+            _mainTitle = Label(_mainPanel, "Detail", new Vector2(0f, 252f), new Vector2(730f, 34f), new Color(220, 235, 242, 255), 0.90f, TextAlignment.Left, 12);
+            _mainBody = Label(_mainPanel, "", new Vector2(0f, -30f), new Vector2(730f, 500f), new Color(220, 235, 242, 255), 0.84f, TextAlignment.Left, 12);
             _mainBody.AutoResize = false;
             _mainBody.VertCenterText = false;
             _mainBody.BuilderMode = TextBuilderModes.Wrapped;
-            _mainBody.LineWrapWidth = 740f;
+            _mainBody.LineWrapWidth = 700f;
 
-            _status = Label(_statusBar, "Shift+Q Open/Close | Click tabs and sidebar items", new Vector2(0f, 0f), new Vector2(1120f, 32f), new Color(185, 210, 225, 255), 0.62f, TextAlignment.Left, 12);
+            _status = Label(_statusBar, "Shift+Q Open/Close  |  Click tabs and sidebar items", new Vector2(0f, 0f), new Vector2(1140f, 30f), new Color(190, 210, 220, 255), 0.70f, TextAlignment.Left, 12);
 
             _created = true;
             HudMain.EnableCursor = _data.PanelVisible;
@@ -138,8 +138,8 @@ namespace ScenariumAPI
             button.Size = size;
             button.Color = color;
             button.HighlightColor = highlight;
-            button.TextBoard.Scale = 0.68f;
-            button.TextBoard.SetFormatting(new GlyphFormat(new Color(235, 245, 255, 255), TextAlignment.Center, 0.68f));
+            button.TextBoard.Scale = 0.78f;
+            button.TextBoard.SetFormatting(new GlyphFormat(new Color(220, 235, 242, 255), TextAlignment.Center, 0.78f));
             button.AutoResize = false;
             button.VertCenterText = true;
             button.MouseInput.RequestCursor = true;
@@ -150,7 +150,7 @@ namespace ScenariumAPI
 
         LabelBoxButton TabButton(string text, float x, string tab)
         {
-            LabelBoxButton button = Button(_tabBar, text, new Vector2(x, 0f), new Vector2(250f, 38f), TabColor(tab), new Color(0, 85, 115, 255), 12);
+            LabelBoxButton button = Button(_tabBar, text, new Vector2(x, 0f), new Vector2(245f, 40f), TabColor(tab), new Color(88, 116, 126, 235), 12);
             button.MouseInput.LeftClicked += delegate
             {
                 _data.PanelTab = tab;
@@ -164,7 +164,7 @@ namespace ScenariumAPI
 
         LabelBoxButton SideButton(string text, float y, string id)
         {
-            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(260f, 42f), new Color(16, 35, 48, 255), new Color(0, 80, 110, 255), 12);
+            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(275f, 48f), new Color(32, 52, 62, 220), new Color(88, 116, 126, 235), 12);
             button.MouseInput.LeftClicked += delegate
             {
                 _data.SelectedItemId = id;
@@ -176,7 +176,7 @@ namespace ScenariumAPI
 
         Color TabColor(string tab)
         {
-            return _data.PanelTab == tab ? new Color(0, 80, 110, 255) : new Color(15, 30, 42, 255);
+            return _data.PanelTab == tab ? new Color(92, 121, 130, 235) : new Color(32, 52, 62, 210);
         }
 
         void ClientReset()
@@ -247,7 +247,7 @@ namespace ScenariumAPI
 
             if (_data.PanelTab == "SCENARIO")
             {
-                _sideTitle.Text = "SCENARIO";
+                _sideTitle.Text = "Scenario";
                 _sideOverview.Text = "Campaign Overview";
                 _sidePrimary.Text = "Current Objective";
                 _sideSecondary.Text = "Progression Chain";
@@ -255,7 +255,7 @@ namespace ScenariumAPI
             }
             else if (_data.PanelTab == "QUESTS")
             {
-                _sideTitle.Text = "QUESTS";
+                _sideTitle.Text = "Quests";
                 _sideOverview.Text = "Quest Overview";
                 _sidePrimary.Text = "Active Objectives";
                 _sideSecondary.Text = "Completed";
@@ -263,7 +263,7 @@ namespace ScenariumAPI
             }
             else if (_data.PanelTab == "FACTIONS")
             {
-                _sideTitle.Text = "FACTIONS";
+                _sideTitle.Text = "Factions";
                 _sideOverview.Text = "Faction Overview";
                 _sidePrimary.Text = "UTD Status";
                 _sideSecondary.Text = "Conquest Chain";
@@ -271,7 +271,7 @@ namespace ScenariumAPI
             }
             else
             {
-                _sideTitle.Text = "INTEL LOG";
+                _sideTitle.Text = "Intel Log";
                 _sideOverview.Text = "Recent Events";
                 _sidePrimary.Text = "Operational Intel";
                 _sideSecondary.Text = "System Notes";
@@ -287,15 +287,23 @@ namespace ScenariumAPI
         void HighlightSideButton(LabelBoxButton button, string id)
         {
             if (button == null) return;
-            button.Color = _data.SelectedItemId == id ? new Color(0, 75, 100, 255) : new Color(16, 35, 48, 255);
+            button.Color = _data.SelectedItemId == id ? new Color(92, 121, 130, 235) : new Color(32, 52, 62, 220);
         }
 
         string BuildMainTitle()
         {
-            if (_data.PanelTab == "SCENARIO") return "SCENARIO / " + _data.SelectedItemId;
-            if (_data.PanelTab == "QUESTS") return "QUESTS / " + _data.SelectedItemId;
-            if (_data.PanelTab == "FACTIONS") return "FACTION STATES / " + _data.SelectedItemId;
-            return "INTEL LOG / " + _data.SelectedItemId;
+            if (_data.PanelTab == "SCENARIO") return "Scenario / " + FormatSelection(_data.SelectedItemId);
+            if (_data.PanelTab == "QUESTS") return "Quests / " + FormatSelection(_data.SelectedItemId);
+            if (_data.PanelTab == "FACTIONS") return "Factions / " + FormatSelection(_data.SelectedItemId);
+            return "Intel Log / " + FormatSelection(_data.SelectedItemId);
+        }
+
+        string FormatSelection(string id)
+        {
+            if (id == "PRIMARY") return "Primary";
+            if (id == "SECONDARY") return "Secondary";
+            if (id == "TERTIARY") return "Details";
+            return "Overview";
         }
 
         string BuildMainBody()
