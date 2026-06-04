@@ -245,9 +245,17 @@ namespace ScenariumAPI
 
         LabelBoxButton SideButton(string text, float y, string id)
         {
-            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(290f, 60f), CardColor, ButtonHoverColor, 14);
-            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Left, 0.86f));
-            button.Offset = new Vector2(10f, y);
+            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(290f, 54f), CardColor, ButtonHoverColor, 18);
+            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Left, 0.68f));
+            button.MouseInput.RequestCursor = true;
+
+            button.MouseInput.LeftClicked += delegate
+            {
+                _data.SelectedItemId = id;
+                Refresh(true);
+                _save();
+            };
+
             return button;
         }
 
@@ -377,8 +385,12 @@ namespace ScenariumAPI
             if (button != null)
             {
                 button.Color = bg;
-                button.TextBoard.SetFormatting(new GlyphFormat(fg, TextAlignment.Left, 0.86f));
+                button.TextBoard.SetFormatting(new GlyphFormat(fg, TextAlignment.Left, 0.68f));
             }
+
+            if (box != null)
+                box.Color = CardColor;
+        }
             if (box != null)
                 box.Color = bg;
         }

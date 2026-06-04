@@ -32,7 +32,9 @@ namespace ScenariumAPI
         ScenariumQueryApi _queryApi;
         NodeDetectionRuntime _nodeDetection;
         MesBindingBridge _mesBridge;
+        MesPermissionExporter _mesExporter;
         ScenariumDataValidationResult _lastValidation;
+        bool _ignorePersistedRuntimeStateOnce;
 
         public override void LoadData()
         {
@@ -49,6 +51,7 @@ namespace ScenariumAPI
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
+            _mesExporter = new MesPermissionExporter(AddEvent);
 
             _hud = new ScenariumHUD(_data, AddEvent, SaveState);
         }
@@ -229,6 +232,12 @@ namespace ScenariumAPI
                 return;
             }
 
+            if (Eq(args[1], "runtime") && args.Length >= 3 && Eq(args[2], "reset"))
+            {
+                ResetState();
+                return;
+            }
+
             if (Eq(args[1], "runtime"))
             {
                 _data.PanelVisible = true;
@@ -348,7 +357,9 @@ namespace ScenariumAPI
 
             _runtime.LoadCampaign(campaign);
 
-            CampaignRuntimeStateData restoredState = _runtimePersistence.LoadRuntimeState();
+            CampaignRuntimeStateData restoredState = _ignorePersistedRuntimeStateOnce ? null : _runtimePersistence.LoadRuntimeState();
+            _ignorePersistedRuntimeStateOnce = false;
+
             if (restoredState != null && string.Equals(restoredState.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
             {
                 _runtime.RestoreState(restoredState);
@@ -358,6 +369,8 @@ namespace ScenariumAPI
             _queryApi.SetRuntime(_runtime);
             if (_mesBridge != null)
                 _mesBridge.Refresh();
+                if (_mesExporter != null)
+                    _mesExporter.Export(_mesBridge.Snapshot);
 
             AddEvent("Campaign reloaded: " + campaign.DisplayName);
             AddEvent("Scenarios: " + campaign.Scenarios.Count + " | Factions: " + campaign.Factions.Count + " | Nodes: " + campaign.ConquestNodes.Count);
@@ -446,6 +459,8 @@ namespace ScenariumAPI
             if (args.Length == 2 || Eq(args[2], "refresh"))
             {
                 _mesBridge.Refresh();
+                if (_mesExporter != null)
+                    _mesExporter.Export(_mesBridge.Snapshot);
                 AddMultilineEvent(_mesBridge.BuildSummary(false, false));
                 return;
             }
@@ -629,22 +644,42 @@ namespace ScenariumAPI
 
         void ResetState()
         {
-            _data = ScenariumSaveData.CreateDefault();
+            AddEvent("Reset command received.");
 
-            if (_runtime != null && _runtime.State != null && _runtimePersistence != null)
-                _runtimePersistence.SaveRuntimeState(_runtime.State);
+            _data.EnsureCollections();
+            _data.PanelVisible = true;
+            _data.PanelTab = "SCENARIO";
+            _data.SelectedItemId = "OVERVIEW";
+
+            _runtime = new CampaignRuntime(AddEvent);
+            _queryApi = new ScenariumQueryApi(_runtime);
+            _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
+            _mesBridge = new MesBindingBridge(_runtime, AddEvent);
+            _mesExporter = new MesPermissionExporter(AddEvent);
+
+            _ignorePersistedRuntimeStateOnce = true;
+
+            AddEvent("Runtime state cleared.");
+            TryReloadCampaign();
+
+            if (_mesBridge != null)
+            {
+                _mesBridge.Refresh();
+
+                if (_mesExporter != null)
+                    _mesExporter.Export(_mesBridge.Snapshot);
+            }
+
+            UpdateHudViewModel();
 
             if (_hud != null)
-                _hud.CloseAndDispose();
-
-            _hud = new ScenariumHUD(_data, AddEvent, SaveState);
-            _hud.Create();
-            _hud.Open();
-
-            AddEvent("Scenarium state reset.");
+            {
+                _hud.Open();
+                _hud.Refresh(true);
+            }
 
             SaveState();
-            _hud.Refresh(true);
+            AddEvent("Scenarium campaign reset complete.");
         }
 
         void AddMultilineEvent(string text)
