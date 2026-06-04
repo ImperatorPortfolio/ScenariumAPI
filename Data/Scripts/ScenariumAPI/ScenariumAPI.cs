@@ -41,6 +41,8 @@ namespace ScenariumAPI
         ScenariumDiagnostics _diagnostics;
         ConquestConsequenceRuntime _consequences;
         CampaignBindingValidator _bindingValidator;
+        NodeTransitionValidator _transitionValidator;
+        TransitionAuditLog _transitionAudit;
         bool _ignorePersistedRuntimeStateOnce;
 
         public override void LoadData()
@@ -63,8 +65,14 @@ namespace ScenariumAPI
             _mesExporter = new MesPermissionExporter(AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
+            _transitionValidator = new NodeTransitionValidator(_runtime);
+            _transitionAudit = new TransitionAuditLog();
+            _transitionValidator = new NodeTransitionValidator(_runtime);
+            _transitionAudit = new TransitionAuditLog();
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
+            _transitionValidator = new NodeTransitionValidator(_runtime);
+            _transitionAudit = new TransitionAuditLog();
 
             _hud = new ScenariumHUD(_data, AddEvent, SaveState);
         }
@@ -183,6 +191,19 @@ namespace ScenariumAPI
                 return;
             }
 
+            if (Eq(args[1], "audit"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddMultilineEvent(_transitionAudit != null ? _transitionAudit.BuildSummary(20) : "Transition audit log is not initialized.");
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
             if (Eq(args[1], "events"))
             {
                 _data.PanelVisible = true;
@@ -242,12 +263,8 @@ namespace ScenariumAPI
                 _data.SelectedItemId = "OVERVIEW";
                 _hud.Open();
 
-                if (Eq(args[4], "destroyed") || Eq(args[4], "destroy"))
-                    DestroyNode(args[3]);
-                else if (Eq(args[4], "captured") || Eq(args[4], "capture"))
-                    CaptureNode(args[3]);
-                else
-                    AddEvent("Transition usage: /scen transition node <nodeId> destroyed|captured");
+                bool force = args.Length >= 6 && Eq(args[5], "force");
+                RunValidatedNodeTransition(args[3], args[4], force);
 
                 SaveState();
                 _hud.Refresh(true);
@@ -585,6 +602,39 @@ namespace ScenariumAPI
             AddEvent("MES commands: /scen mes refresh | nodes | allowed | denied | can <spawnGroup>");
         }
 
+
+        void RunValidatedNodeTransition(string nodeId, string transition, bool force)
+        {
+            if (_transitionValidator == null)
+                _transitionValidator = new NodeTransitionValidator(_runtime);
+
+            NodeTransitionResult result = _transitionValidator.Validate(nodeId, transition, force);
+
+            if (_transitionAudit != null)
+                _transitionAudit.Record(result);
+
+            if (!result.Allowed)
+            {
+                AddEvent("DENIED | " + nodeId + " | " + result.Reason);
+                return;
+            }
+
+            if (Eq(transition, "destroy") || Eq(transition, "destroyed"))
+                DestroyNode(nodeId);
+            else if (Eq(transition, "capture") || Eq(transition, "captured"))
+                CaptureNode(nodeId);
+            else
+                AddEvent("Transition usage: /scen transition node <nodeId> destroyed|captured [force]");
+
+            var after = _runtime != null ? _runtime.GetNodeState(nodeId) : null;
+            result.NewState = after != null ? after.State.ToString() : result.PreviousState;
+
+            if (_transitionAudit != null)
+                _transitionAudit.Record(result);
+
+            AddEvent((result.Forced ? "FORCED" : "ALLOW") + " | " + nodeId + " | " + result.PreviousState + " -> " + result.NewState);
+        }
+
         void RunQueryCommand(string[] args)
         {
             if (_queryApi == null)
@@ -756,8 +806,12 @@ namespace ScenariumAPI
             _mesExporter = new MesPermissionExporter(AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
+            _transitionValidator = new NodeTransitionValidator(_runtime);
+            _transitionAudit = new TransitionAuditLog();
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
+            _transitionValidator = new NodeTransitionValidator(_runtime);
+            _transitionAudit = new TransitionAuditLog();
 
             _ignorePersistedRuntimeStateOnce = true;
 
