@@ -5,6 +5,12 @@ using VRage.Input;
 using VRage.Utils;
 using System;
 using System.IO;
+using ScenariumAPI.Loading;
+using ScenariumAPI.Validation;
+using ScenariumAPI.Runtime;
+using ScenariumAPI.Data;
+using ScenariumAPI.Persistence;
+using ScenariumAPI.Api;
 
 namespace ScenariumAPI
 {
@@ -18,6 +24,13 @@ namespace ScenariumAPI
         ScenariumSaveData _data;
         ScenariumHUD _hud;
 
+        CampaignPackLoader _loader;
+        CampaignValidator _validator;
+        CampaignRuntime _runtime;
+        ScenariumPersistence _runtimePersistence;
+        ScenariumQueryApi _queryApi;
+        ScenariumDataValidationResult _lastValidation;
+
         public override void LoadData()
         {
             _data = LoadState();
@@ -25,6 +38,13 @@ namespace ScenariumAPI
                 _data = ScenariumSaveData.CreateDefault();
 
             _data.EnsureCollections();
+
+            _loader = new CampaignPackLoader();
+            _validator = new CampaignValidator();
+            _runtime = new CampaignRuntime(AddEvent);
+            _runtimePersistence = new ScenariumPersistence();
+            _queryApi = new ScenariumQueryApi(_runtime);
+
             _hud = new ScenariumHUD(_data, AddEvent, SaveState);
         }
 
@@ -34,6 +54,9 @@ namespace ScenariumAPI
 
             if (MyAPIGateway.Utilities != null)
                 MyAPIGateway.Utilities.MessageEntered -= OnMessageEntered;
+
+            if (_runtime != null && _runtime.State != null && _runtimePersistence != null)
+                _runtimePersistence.SaveRuntimeState(_runtime.State);
 
             if (_hud != null)
                 _hud.CloseAndDispose();
@@ -46,8 +69,16 @@ namespace ScenariumAPI
                 _initialized = true;
                 MyAPIGateway.Utilities.MessageEntered += OnMessageEntered;
 
-                AddEvent("ScenariumAPI interactive RichHud UI initialized.");
+                AddEvent("ScenariumAPI campaign loader initialized.");
                 _hud.Create();
+                TryReloadCampaign();
+
+                CampaignRuntimeStateData restoredState = _runtimePersistence.LoadRuntimeState();
+                if (restoredState != null && _runtime != null && _runtime.Campaign != null)
+                {
+                    _runtime.RestoreState(restoredState);
+                    AddEvent("Persisted runtime state restored.");
+                }
             }
 
             _tick++;
@@ -91,10 +122,104 @@ namespace ScenariumAPI
                 return;
             }
 
-            if (Eq(args[1], "scenario")) { SetTab("SCENARIO"); return; }
+            if (Eq(args[1], "scenario") || Eq(args[1], "campaign")) { SetTab("SCENARIO"); return; }
             if (Eq(args[1], "quest") || Eq(args[1], "quests")) { SetTab("QUESTS"); return; }
             if (Eq(args[1], "factions")) { SetTab("FACTIONS"); return; }
             if (Eq(args[1], "events") || Eq(args[1], "intel") || Eq(args[1], "log")) { SetTab("INTEL"); return; }
+
+            if (Eq(args[1], "reload"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddEvent("Reload command received.");
+                bool loaded = TryReloadCampaign();
+                AddEvent(loaded ? "Reload complete." : "Reload failed. Check Intel Log.");
+
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "validate"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                ValidateCampaign();
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "runtime"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddEvent(_runtime != null ? _runtime.GetRuntimeSummary() : "No runtime available.");
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "query") && args.Length >= 3)
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                RunQueryCommand(args);
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "nodes"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                ListNodes();
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "destroy") && args.Length >= 3)
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                DestroyNode(args[2]);
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "capture") && args.Length >= 3)
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                CaptureNode(args[2]);
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
 
             if (Eq(args[1], "complete") && args.Length >= 3)
             {
@@ -124,6 +249,144 @@ namespace ScenariumAPI
 
             AddEvent("Unknown command.");
             _hud.Refresh(true);
+        }
+
+        bool TryReloadCampaign()
+        {
+            CampaignData campaign;
+            if (!_loader.TryLoad(out campaign))
+            {
+                AddEvent("Campaign reload failed: " + _loader.LastError);
+                return false;
+            }
+
+            _lastValidation = _validator.Validate(campaign);
+
+            if (!_lastValidation.IsValid)
+            {
+                AddEvent("Campaign validation failed. Errors: " + _lastValidation.Errors.Count);
+                foreach (string error in _lastValidation.Errors)
+                    AddEvent("ERROR: " + error);
+                return false;
+            }
+
+            foreach (string warning in _lastValidation.Warnings)
+                AddEvent("WARN: " + warning);
+
+            _runtime.LoadCampaign(campaign);
+
+            CampaignRuntimeStateData restoredState = _runtimePersistence.LoadRuntimeState();
+            if (restoredState != null && string.Equals(restoredState.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+            {
+                _runtime.RestoreState(restoredState);
+                AddEvent("Existing runtime state restored for: " + campaign.DisplayName);
+            }
+
+            _queryApi.SetRuntime(_runtime);
+            AddEvent("Campaign reloaded: " + campaign.DisplayName);
+            AddEvent("Scenarios: " + campaign.Scenarios.Count + " | Factions: " + campaign.Factions.Count + " | Nodes: " + campaign.ConquestNodes.Count);
+            if (_lastValidation != null)
+                AddEvent("Validation warnings: " + _lastValidation.Warnings.Count);
+            return true;
+        }
+
+        void ValidateCampaign()
+        {
+            if (_loader.LoadedCampaign == null)
+            {
+                AddEvent("No campaign loaded. Run /scen reload.");
+                return;
+            }
+
+            _lastValidation = _validator.Validate(_loader.LoadedCampaign);
+
+            AddEvent("Validation: " + (_lastValidation.IsValid ? "VALID" : "INVALID") +
+                " | Errors: " + _lastValidation.Errors.Count +
+                " | Warnings: " + _lastValidation.Warnings.Count);
+
+            foreach (string error in _lastValidation.Errors)
+                AddEvent("ERROR: " + error);
+
+            foreach (string warning in _lastValidation.Warnings)
+                AddEvent("WARN: " + warning);
+        }
+
+        void ListNodes()
+        {
+            if (_runtime == null || _runtime.Campaign == null || _runtime.State == null)
+            {
+                AddEvent("No runtime campaign loaded. Run /scen reload.");
+                return;
+            }
+
+            AddEvent("Conquest nodes:");
+
+            foreach (var state in _runtime.State.ConquestNodes)
+            {
+                var def = _runtime.GetNodeDefinition(state.NodeId);
+                string name = def != null ? def.DisplayName : state.NodeId;
+                AddEvent(state.NodeId + " | " + name + " | " + state.State);
+            }
+        }
+
+        void DestroyNode(string nodeId)
+        {
+            if (_runtime == null || _runtime.Campaign == null)
+            {
+                AddEvent("No runtime campaign loaded. Run /scen reload.");
+                return;
+            }
+
+            _runtime.DestroyNode(nodeId);
+        }
+
+        void CaptureNode(string nodeId)
+        {
+            if (_runtime == null || _runtime.Campaign == null)
+            {
+                AddEvent("No runtime campaign loaded. Run /scen reload.");
+                return;
+            }
+
+            _runtime.CaptureNode(nodeId);
+        }
+
+
+        void RunQueryCommand(string[] args)
+        {
+            if (_queryApi == null)
+            {
+                AddEvent("Query API is not initialized.");
+                return;
+            }
+
+            if (Eq(args[2], "campaign"))
+            {
+                AddEvent("Campaign loaded: " + _queryApi.IsCampaignLoaded());
+                AddEvent("CampaignId: " + (_queryApi.GetCampaignId() ?? "none"));
+                return;
+            }
+
+            if (Eq(args[2], "faction") && args.Length >= 4)
+            {
+                AddEvent("Faction " + args[3] + " state: " + _queryApi.GetFactionState(args[3]));
+                AddEvent("Faction " + args[3] + " defeated: " + _queryApi.IsFactionDefeated(args[3]));
+                return;
+            }
+
+            if (Eq(args[2], "node") && args.Length >= 4)
+            {
+                AddEvent("Node " + args[3] + " state: " + _queryApi.GetNodeState(args[3]));
+                return;
+            }
+
+            if (Eq(args[2], "spawn") && args.Length >= 5)
+            {
+                AddEvent("Can faction " + args[3] + " spawn in " + args[4] + ": " + _queryApi.CanFactionSpawn(args[3], args[4]));
+                return;
+            }
+
+            AddEvent("Query usage: /scen query campaign | faction <tag> | node <id> | spawn <tag> <sector>");
         }
 
         bool Eq(string a, string b)
@@ -243,6 +506,9 @@ namespace ScenariumAPI
         {
             _data = ScenariumSaveData.CreateDefault();
 
+            if (_runtime != null && _runtime.State != null && _runtimePersistence != null)
+                _runtimePersistence.SaveRuntimeState(_runtime.State);
+
             if (_hud != null)
                 _hud.CloseAndDispose();
 
@@ -317,6 +583,9 @@ namespace ScenariumAPI
 
                 writer.Write(xml);
                 writer.Close();
+
+                if (_runtimePersistence != null && _runtime != null && _runtime.State != null)
+                    _runtimePersistence.SaveRuntimeState(_runtime.State);
             }
             catch (Exception e)
             {
