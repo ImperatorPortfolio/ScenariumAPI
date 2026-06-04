@@ -11,6 +11,7 @@ using ScenariumAPI.Runtime;
 using ScenariumAPI.Data;
 using ScenariumAPI.Persistence;
 using ScenariumAPI.Api;
+using ScenariumAPI.Integrations.MES;
 
 namespace ScenariumAPI
 {
@@ -29,6 +30,8 @@ namespace ScenariumAPI
         CampaignRuntime _runtime;
         ScenariumPersistence _runtimePersistence;
         ScenariumQueryApi _queryApi;
+        NodeDetectionRuntime _nodeDetection;
+        MesBindingBridge _mesBridge;
         ScenariumDataValidationResult _lastValidation;
 
         public override void LoadData()
@@ -44,6 +47,8 @@ namespace ScenariumAPI
             _runtime = new CampaignRuntime(AddEvent);
             _runtimePersistence = new ScenariumPersistence();
             _queryApi = new ScenariumQueryApi(_runtime);
+            _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
+            _mesBridge = new MesBindingBridge(_runtime, AddEvent);
 
             _hud = new ScenariumHUD(_data, AddEvent, SaveState);
         }
@@ -84,6 +89,12 @@ namespace ScenariumAPI
             _tick++;
 
             HandleKeyboardInput();
+
+            if (_nodeDetection != null && _tick % 120 == 0)
+            {
+                _nodeDetection.Update();
+                UpdateHudViewModel();
+            }
 
             if (_hud != null && _tick % 30 == 0)
                 _hud.Refresh(false);
@@ -151,6 +162,68 @@ namespace ScenariumAPI
                 _hud.Open();
 
                 ValidateCampaign();
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "mes"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                HandleMesCommand(args);
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "scan"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                if (_nodeDetection == null)
+                    AddEvent("Node detection runtime is not initialized.");
+                else
+                    _nodeDetection.Scan();
+
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "tracked"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                if (_nodeDetection == null)
+                    AddEvent("Node detection runtime is not initialized.");
+                else
+                    AddMultilineEvent(_nodeDetection.GetTrackedSummary());
+
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
+            if (Eq(args[1], "trackclear"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                if (_nodeDetection != null)
+                    _nodeDetection.Clear();
+
                 SaveState();
                 _hud.Refresh(true);
                 return;
@@ -283,6 +356,9 @@ namespace ScenariumAPI
             }
 
             _queryApi.SetRuntime(_runtime);
+            if (_mesBridge != null)
+                _mesBridge.Refresh();
+
             AddEvent("Campaign reloaded: " + campaign.DisplayName);
             AddEvent("Scenarios: " + campaign.Scenarios.Count + " | Factions: " + campaign.Factions.Count + " | Nodes: " + campaign.ConquestNodes.Count);
             if (_lastValidation != null)
@@ -351,6 +427,55 @@ namespace ScenariumAPI
             _runtime.CaptureNode(nodeId);
         }
 
+
+        void UpdateHudViewModel()
+        {
+            if (_hud != null)
+                _hud.SetViewModel(ScenariumViewModel.FromRuntime(_runtime));
+        }
+
+
+        void HandleMesCommand(string[] args)
+        {
+            if (_mesBridge == null)
+            {
+                AddEvent("MES bridge is not initialized.");
+                return;
+            }
+
+            if (args.Length == 2 || Eq(args[2], "refresh"))
+            {
+                _mesBridge.Refresh();
+                AddMultilineEvent(_mesBridge.BuildSummary(false, false));
+                return;
+            }
+
+            if (Eq(args[2], "nodes") || Eq(args[2], "all"))
+            {
+                AddMultilineEvent(_mesBridge.BuildSummary(false, false));
+                return;
+            }
+
+            if (Eq(args[2], "allowed"))
+            {
+                AddMultilineEvent(_mesBridge.BuildSummary(true, false));
+                return;
+            }
+
+            if (Eq(args[2], "denied"))
+            {
+                AddMultilineEvent(_mesBridge.BuildSummary(false, true));
+                return;
+            }
+
+            if (Eq(args[2], "can") && args.Length >= 4)
+            {
+                AddEvent("MES spawn allowed for " + args[3] + ": " + _mesBridge.IsSpawnAllowed(args[3]));
+                return;
+            }
+
+            AddEvent("MES commands: /scen mes refresh | nodes | allowed | denied | can <spawnGroup>");
+        }
 
         void RunQueryCommand(string[] args)
         {
@@ -520,6 +645,17 @@ namespace ScenariumAPI
 
             SaveState();
             _hud.Refresh(true);
+        }
+
+        void AddMultilineEvent(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            string[] lines = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (string line in lines)
+                AddEvent(line.Trim());
         }
 
         void AddEvent(string message)

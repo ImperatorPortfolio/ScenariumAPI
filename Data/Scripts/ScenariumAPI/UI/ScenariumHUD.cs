@@ -14,6 +14,7 @@ namespace ScenariumAPI
         readonly ScenariumSaveData _data;
         readonly Action<string> _addEvent;
         readonly Action _save;
+        ScenariumViewModel _viewModel;
 
         TexturedBox _root;
         TexturedBox _titleBar;
@@ -83,6 +84,13 @@ namespace ScenariumAPI
             _data = data;
             _addEvent = addEvent;
             _save = save;
+            _viewModel = new ScenariumViewModel();
+        }
+
+        public void SetViewModel(ScenariumViewModel viewModel)
+        {
+            _viewModel = viewModel ?? new ScenariumViewModel();
+            Refresh(true);
         }
 
         public void Create()
@@ -118,21 +126,21 @@ namespace ScenariumAPI
             _statusBar = Box(_root, new Vector2(1240f,  42f), new Vector2(0f, -374f), HeaderColor,   11);
 
             // Main content cards
-            _summaryBox  = Box(_mainPanel, new Vector2(778f, 100f), new Vector2(0f,  218f), CardColor, 12);
-            _summarySep  = Box(_mainPanel, new Vector2(778f,   1f), new Vector2(0f,  168f), SepColor,  13);
-            _detailBox   = Box(_mainPanel, new Vector2(778f, 308f), new Vector2(0f,    4f), new Color(12, 18, 24, 225), 12);
-            _activitySep = Box(_mainPanel, new Vector2(778f,   1f), new Vector2(0f, -149f), SepColor,  13);
-            _activityBox = Box(_mainPanel, new Vector2(778f, 142f), new Vector2(0f, -224f), CardColor, 12);
+            _summaryBox  = Box(_mainPanel, new Vector2(778f, 118f), new Vector2(0f,  210f), CardColor, 12);
+            _summarySep  = Box(_mainPanel, new Vector2(778f,   1f), new Vector2(0f,  150f), SepColor,  13);
+            _detailBox   = Box(_mainPanel, new Vector2(778f, 350f), new Vector2(0f,  -28f), new Color(12, 18, 24, 225), 12);
+            _activitySep = Box(_mainPanel, new Vector2(778f,   1f), new Vector2(0f, -205f), SepColor,  13);
+            _activityBox = Box(_mainPanel, new Vector2(778f, 100f), new Vector2(0f, -258f), CardColor, 12);
 
             // Sidebar nav cards
-            _sideBoxA = Box(_sidePanel, new Vector2(290f, 54f), new Vector2(0f,  180f), CardColor, 12);
-            _sideBoxB = Box(_sidePanel, new Vector2(290f, 54f), new Vector2(0f,  112f), CardColor, 12);
-            _sideBoxC = Box(_sidePanel, new Vector2(290f, 54f), new Vector2(0f,   42f), CardColor, 12);
-            _sideBoxD = Box(_sidePanel, new Vector2(290f, 54f), new Vector2(0f,  -28f), CardColor, 12);
+            _sideBoxA = Box(_sidePanel, new Vector2(290f, 60f), new Vector2(0f,  176f), CardColor, 12);
+            _sideBoxB = Box(_sidePanel, new Vector2(290f, 60f), new Vector2(0f,  100f), CardColor, 12);
+            _sideBoxC = Box(_sidePanel, new Vector2(290f, 60f), new Vector2(0f,   24f), CardColor, 12);
+            _sideBoxD = Box(_sidePanel, new Vector2(290f, 60f), new Vector2(0f,  -52f), CardColor, 12);
 
             // Title bar labels
-            _title     = Label(_titleBar, "SCENARIUM",                  new Vector2(-496f,  10f), new Vector2(340f, 30f), AccentColor,    0.88f, TextAlignment.Left,   13);
-            _subTitle  = Label(_titleBar, "Campaign Control Interface", new Vector2(-496f, -14f), new Vector2(420f, 20f), MutedTextColor, 0.52f, TextAlignment.Left,   13);
+            _title     = Label(_titleBar, "SCENARIUM",                  new Vector2(-438f,  10f), new Vector2(360f, 32f), AccentColor,    1.08f, TextAlignment.Left,   13);
+            _subTitle  = Label(_titleBar, "Campaign Control Interface", new Vector2(-438f, -14f), new Vector2(440f, 22f), MutedTextColor, 0.66f, TextAlignment.Left,   13);
             _closeButton = Button(_titleBar, "✕", new Vector2(578f, 0f), new Vector2(36f, 36f), CloseColor, CloseHoverColor, 13);
             _closeButton.MouseInput.LeftClicked += delegate { Close(); _addEvent("Scenarium panel closed."); _save(); };
 
@@ -143,31 +151,31 @@ namespace ScenariumAPI
             _tabIntel    = TabButton("INTEL LOG",  420f, "INTEL");
 
             // Sidebar nav
-            _sideTitle     = Label(_sidePanel, "NAVIGATION", new Vector2(0f, 256f), new Vector2(290f, 28f), AccentDimColor, 0.60f, TextAlignment.Center, 13);
-            _sideOverview  = SideButton("Overview",  180f, "OVERVIEW");
-            _sidePrimary   = SideButton("Primary",   112f, "PRIMARY");
-            _sideSecondary = SideButton("Secondary",  42f, "SECONDARY");
-            _sideTertiary  = SideButton("Details",   -28f, "TERTIARY");
+            _sideTitle     = Label(_sidePanel, "NAVIGATION", new Vector2(0f, 258f), new Vector2(300f, 30f), AccentDimColor, 0.78f, TextAlignment.Center, 13);
+            _sideOverview  = SideButton("Overview",  176f, "OVERVIEW");
+            _sidePrimary   = SideButton("Primary",   100f, "PRIMARY");
+            _sideSecondary = SideButton("Secondary",  24f, "SECONDARY");
+            _sideTertiary  = SideButton("Details",   -52f, "TERTIARY");
 
             // Summary card
-            _summaryTitle = Label(_summaryBox, "SUMMARY", new Vector2(-358f,  30f), new Vector2(220f, 20f), AccentDimColor, 0.58f, TextAlignment.Left, 13);
-            _summaryBody  = Label(_summaryBox, "",         new Vector2(  0f, -14f), new Vector2(730f, 56f), TextColor,      0.66f, TextAlignment.Left, 13);
+            _summaryTitle = Label(_summaryBox, "SUMMARY", new Vector2(0f,  40f), new Vector2(710f, 24f), AccentDimColor, 0.78f, TextAlignment.Left, 13);
+            _summaryBody  = Label(_summaryBox, "",         new Vector2(  0f, -12f), new Vector2(700f, 76f), TextColor,      0.84f, TextAlignment.Left, 13);
             _summaryBody.VertCenterText = false;
 
             // Detail card
-            _detailTitle = Label(_detailBox, "DETAILS", new Vector2(-358f, 132f), new Vector2(220f, 20f), AccentDimColor, 0.58f, TextAlignment.Left,  13);
-            _detailBody  = Label(_detailBox, "",         new Vector2(  0f, -14f), new Vector2(730f, 252f), TextColor,     0.64f, TextAlignment.Left,  13);
+            _detailTitle = Label(_detailBox, "DETAILS", new Vector2(-358f, 150f), new Vector2(220f, 20f), AccentDimColor, 0.58f, TextAlignment.Left,  13);
+            _detailBody  = Label(_detailBox, "",         new Vector2(  0f, -12f), new Vector2(700f, 292f), TextColor,     0.80f, TextAlignment.Left,  13);
             _detailBody.VertCenterText = false;
-            _detailBody.LineWrapWidth = 710f;
+            _detailBody.LineWrapWidth = 680f;
 
             // Activity card
-            _activityTitle = Label(_activityBox, "RECENT ACTIVITY", new Vector2(-358f, 50f), new Vector2(280f, 20f), AccentDimColor, 0.58f, TextAlignment.Left, 13);
-            _activityBody  = Label(_activityBox, "",                  new Vector2(  0f, -16f), new Vector2(730f, 92f), TextColor,     0.60f, TextAlignment.Left, 13);
+            _activityTitle = Label(_activityBox, "RECENT ACTIVITY", new Vector2(0f, 32f), new Vector2(710f, 24f), AccentDimColor, 0.74f, TextAlignment.Left, 13);
+            _activityBody  = Label(_activityBox, "",                  new Vector2(  0f, -18f), new Vector2(700f, 62f), TextColor,     0.74f, TextAlignment.Left, 13);
             _activityBody.VertCenterText = false;
-            _activityBody.LineWrapWidth = 710f;
+            _activityBody.LineWrapWidth = 680f;
 
             // Status bar
-            _status = Label(_statusBar, "SHIFT+Q  Open / Close   |   Click tabs and sidebar cards to navigate", new Vector2(-556f, 0f), new Vector2(1100f, 28f), MutedTextColor, 0.56f, TextAlignment.Left, 13);
+            _status = Label(_statusBar, "SHIFT+Q  Open / Close   |   Click tabs and sidebar cards to navigate", new Vector2(0f, 0f), new Vector2(1120f, 30f), MutedTextColor, 0.72f, TextAlignment.Left, 13);
 
             _created = true;
             HudMain.EnableCursor = _data.PanelVisible;
@@ -210,8 +218,8 @@ namespace ScenariumAPI
             button.Size = size;
             button.Color = color;
             button.HighlightColor = highlight;
-            button.TextBoard.Scale = 0.68f;
-            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Center, 0.68f));
+            button.TextBoard.Scale = 0.82f;
+            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Center, 0.82f));
             button.AutoResize = false;
             button.VertCenterText = true;
             button.MouseInput.RequestCursor = true;
@@ -222,8 +230,8 @@ namespace ScenariumAPI
 
         LabelBoxButton TabButton(string text, float x, string tab)
         {
-            LabelBoxButton button = Button(_tabBar, text, new Vector2(x, 0f), new Vector2(245f, 36f), TabColor(tab), ButtonHoverColor, 13);
-            button.TextBoard.SetFormatting(new GlyphFormat(TabTextColor(tab), TextAlignment.Center, 0.64f));
+            LabelBoxButton button = Button(_tabBar, text, new Vector2(x, 0f), new Vector2(245f, 42f), TabColor(tab), ButtonHoverColor, 13);
+            button.TextBoard.SetFormatting(new GlyphFormat(TabTextColor(tab), TextAlignment.Center, 0.82f));
             button.MouseInput.LeftClicked += delegate
             {
                 _data.PanelTab = tab;
@@ -237,8 +245,8 @@ namespace ScenariumAPI
 
         LabelBoxButton SideButton(string text, float y, string id)
         {
-            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(290f, 54f), CardColor, ButtonHoverColor, 14);
-            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Left, 0.68f));
+            LabelBoxButton button = Button(_sidePanel, text, new Vector2(0f, y), new Vector2(290f, 60f), CardColor, ButtonHoverColor, 14);
+            button.TextBoard.SetFormatting(new GlyphFormat(TextColor, TextAlignment.Left, 0.86f));
             button.Offset = new Vector2(10f, y);
             return button;
         }
@@ -281,7 +289,7 @@ namespace ScenariumAPI
             UpdateTabVisuals();
             UpdateSidebar();
 
-            string hashText = _data.PanelTab + "|" + _data.SelectedItemId + "|" + _data.Events.Count + "|" + CountActiveQuests() + "|" + CountCompletedQuests();
+            string hashText = _data.PanelTab + "|" + _data.SelectedItemId + "|" + _data.Events.Count + "|" + CountActiveQuests() + "|" + CountCompletedQuests() + "|" + (_viewModel != null ? _viewModel.Version : 0);
             int hash = hashText.GetHashCode();
 
             if (force || hash != _lastHash)
@@ -300,22 +308,22 @@ namespace ScenariumAPI
             if (_tabScenario != null)
             {
                 _tabScenario.Color = TabColor("SCENARIO");
-                _tabScenario.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("SCENARIO"), TextAlignment.Center, 0.64f));
+                _tabScenario.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("SCENARIO"), TextAlignment.Center, 0.82f));
             }
             if (_tabQuests != null)
             {
                 _tabQuests.Color = TabColor("QUESTS");
-                _tabQuests.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("QUESTS"), TextAlignment.Center, 0.64f));
+                _tabQuests.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("QUESTS"), TextAlignment.Center, 0.82f));
             }
             if (_tabFactions != null)
             {
                 _tabFactions.Color = TabColor("FACTIONS");
-                _tabFactions.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("FACTIONS"), TextAlignment.Center, 0.64f));
+                _tabFactions.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("FACTIONS"), TextAlignment.Center, 0.82f));
             }
             if (_tabIntel != null)
             {
                 _tabIntel.Color = TabColor("INTEL");
-                _tabIntel.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("INTEL"), TextAlignment.Center, 0.64f));
+                _tabIntel.TextBoard.SetFormatting(new GlyphFormat(TabTextColor("INTEL"), TextAlignment.Center, 0.82f));
             }
         }
 
@@ -369,7 +377,7 @@ namespace ScenariumAPI
             if (button != null)
             {
                 button.Color = bg;
-                button.TextBoard.SetFormatting(new GlyphFormat(fg, TextAlignment.Left, 0.68f));
+                button.TextBoard.SetFormatting(new GlyphFormat(fg, TextAlignment.Left, 0.86f));
             }
             if (box != null)
                 box.Color = bg;
@@ -377,8 +385,8 @@ namespace ScenariumAPI
 
         void PopulateContent()
         {
-            _summaryTitle.Text  = PrettyTab(_data.PanelTab).ToUpper() + " — SUMMARY";
-            _detailTitle.Text   = PrettyTab(_data.PanelTab).ToUpper() + " / " + FormatSelection(_data.SelectedItemId).ToUpper();
+            _summaryTitle.Text  = "SUMMARY";
+            _detailTitle.Text   = PrettyTab(_data.PanelTab).ToUpper() + "  •  " + FormatSelection(_data.SelectedItemId).ToUpper();
             _activityTitle.Text = "RECENT ACTIVITY";
 
             if (_data.PanelTab == "SCENARIO") PopulateScenario();
@@ -386,15 +394,15 @@ namespace ScenariumAPI
             else if (_data.PanelTab == "FACTIONS") PopulateFactions();
             else PopulateIntel();
 
-            _activityBody.Text = BuildRecentEvents(4);
+            _activityBody.Text = BuildRecentEvents(2);
         }
 
         void PopulateScenario()
         {
             _summaryBody.Text =
-                "Campaign: " + _data.CampaignId + "     " +
-                "Sector: " + _data.CurrentSector + "     " +
-                "Stage: " + _data.CampaignStage;
+                "Campaign: " + GetCampaignName() + "     " +
+                "Sector: " + GetSectorName() + "     " +
+                "State: " + GetCampaignState();
 
             if (_data.SelectedItemId == "PRIMARY")
             {
@@ -421,10 +429,10 @@ namespace ScenariumAPI
             {
                 _detailBody.Text =
                     "SECTOR STATUS\n\n" +
-                    "Current Sector:     " + _data.CurrentSector + "\n" +
-                    "Campaign Stage:     " + _data.CampaignStage + "\n" +
-                    "Tracked Factions:   " + _data.Factions.Count + "\n" +
-                    "Tracked Quests:     " + _data.Quests.Count;
+                    "Current Sector:     " + GetSectorName() + "\n" +
+                    "Campaign State:      " + GetCampaignState() + "\n" +
+                    "Tracked Factions:   " + GetFactionCount() + "\n" +
+                    "Tracked Nodes:      " + GetNodeCount();
                 return;
             }
 
@@ -484,7 +492,7 @@ namespace ScenariumAPI
         void PopulateFactions()
         {
             _summaryBody.Text =
-                "Tracked Factions: " + _data.Factions.Count + "     UTD: " + GetFactionState("UTD");
+                "Tracked Factions: " + GetFactionCount() + "     UTD: " + GetFactionState("UTD");
 
             if (_data.SelectedItemId == "PRIMARY")
             {
@@ -498,12 +506,7 @@ namespace ScenariumAPI
 
             if (_data.SelectedItemId == "SECONDARY")
             {
-                _detailBody.Text =
-                    "UTD CONQUEST CHAIN\n\n" +
-                    GetQuestMark("UTD_OUTPOST")          + "  Military Outpost\n" +
-                    GetQuestMark("UTD_REGIONAL_BASE")    + "  Regional Military Base\n" +
-                    GetQuestMark("UTD_HQ")               + "  Clan HQ\n" +
-                    GetQuestMark("GATE_ALPHA_COMPONENT") + "  Jump Gate Component Reward";
+                _detailBody.Text = BuildNodeStatusLines();
                 return;
             }
 
@@ -520,15 +523,25 @@ namespace ScenariumAPI
 
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("FACTION OVERVIEW\n");
-            foreach (ScenariumFactionState f in _data.Factions)
-                sb.AppendLine(f.Tag + "     " + f.State + (f.Defeated ? "     DEFEATED" : ""));
+
+            if (_viewModel != null && _viewModel.FactionLines != null && _viewModel.FactionLines.Count > 0)
+            {
+                foreach (string line in _viewModel.FactionLines)
+                    sb.AppendLine(line);
+            }
+            else
+            {
+                foreach (ScenariumFactionState f in _data.Factions)
+                    sb.AppendLine(f.Tag + "     " + f.State + (f.Defeated ? "     DEFEATED" : ""));
+            }
+
             _detailBody.Text = sb.ToString();
         }
 
         void PopulateIntel()
         {
             _summaryBody.Text =
-                "Events: " + _data.Events.Count + "     Runtime messages and command feedback";
+                "Events: " + _data.Events.Count + "     Nodes: " + GetNodeCount() + "     Runtime command feedback";
 
             if (_data.SelectedItemId == "PRIMARY")
             {
@@ -562,7 +575,74 @@ namespace ScenariumAPI
                 return;
             }
 
-            _detailBody.Text = BuildRecentEvents(12);
+            if (_viewModel != null && _viewModel.NodeLines != null && _viewModel.NodeLines.Count > 0)
+            {
+                _detailBody.Text = BuildNodeStatusLines() + "\n" + BuildRecentEvents(5);
+            }
+            else
+            {
+                _detailBody.Text = BuildRecentEvents(12);
+            }
+        }
+
+
+        string GetCampaignName()
+        {
+            if (_viewModel != null && !string.IsNullOrWhiteSpace(_viewModel.CampaignDisplayName))
+                return _viewModel.CampaignDisplayName;
+
+            return _data.CampaignId;
+        }
+
+        string GetSectorName()
+        {
+            if (_viewModel != null && !string.IsNullOrWhiteSpace(_viewModel.CurrentSectorId))
+                return _viewModel.CurrentSectorId;
+
+            return _data.CurrentSector;
+        }
+
+        string GetCampaignState()
+        {
+            if (_viewModel != null && !string.IsNullOrWhiteSpace(_viewModel.CampaignState))
+                return _viewModel.CampaignState;
+
+            return _data.CampaignStage;
+        }
+
+        int GetFactionCount()
+        {
+            if (_viewModel != null && _viewModel.FactionLines != null && _viewModel.FactionLines.Count > 0)
+                return _viewModel.FactionLines.Count;
+
+            return _data.Factions.Count;
+        }
+
+        int GetNodeCount()
+        {
+            if (_viewModel != null && _viewModel.NodeLines != null)
+                return _viewModel.NodeLines.Count;
+
+            return 0;
+        }
+
+        string BuildNodeStatusLines()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("CONQUEST NODES\n");
+
+            if (_viewModel != null && _viewModel.NodeLines != null && _viewModel.NodeLines.Count > 0)
+            {
+                foreach (string line in _viewModel.NodeLines)
+                    sb.AppendLine(line);
+            }
+            else
+            {
+                sb.AppendLine("No conquest nodes loaded.");
+                sb.AppendLine("Run /scen reload.");
+            }
+
+            return sb.ToString();
         }
 
         string BuildRecentEvents(int max)
@@ -571,7 +651,7 @@ namespace ScenariumAPI
             int start = Math.Max(0, _data.Events.Count - max);
 
             for (int i = start; i < _data.Events.Count; i++)
-                sb.AppendLine("> " + _data.Events[i].Message);
+                sb.AppendLine("• " + _data.Events[i].Message);
 
             if (sb.Length == 0)
                 sb.AppendLine("No recent events.");
