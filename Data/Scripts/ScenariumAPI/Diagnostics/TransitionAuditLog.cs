@@ -8,6 +8,11 @@ namespace ScenariumAPI.Diagnostics
     {
         readonly List<NodeTransitionResult> _entries = new List<NodeTransitionResult>();
 
+        public int Count
+        {
+            get { return _entries.Count; }
+        }
+
         public void Record(NodeTransitionResult result)
         {
             if (result == null)

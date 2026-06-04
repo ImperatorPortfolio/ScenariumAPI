@@ -1,12 +1,13 @@
 using System.Text;
 using ScenariumAPI.Runtime;
 using ScenariumAPI.Integrations.MES;
+using ScenariumAPI.Events;
 
 namespace ScenariumAPI.Diagnostics
 {
     public class ScenariumDiagnostics
     {
-        public string BuildRuntimeReport(CampaignRuntime runtime, MesBindingBridge mesBridge)
+        public string BuildRuntimeReport(CampaignRuntime runtime, MesBindingBridge mesBridge, ScenariumEventBus eventBus, TransitionAuditLog auditLog)
         {
             StringBuilder sb = new StringBuilder();
 
@@ -29,6 +30,9 @@ namespace ScenariumAPI.Diagnostics
                 sb.AppendLine("MES Permissions: " + mesBridge.Snapshot.Permissions.Count);
             else
                 sb.AppendLine("MES Permissions: unavailable");
+
+            sb.AppendLine("Events: " + (eventBus != null ? eventBus.Count : 0));
+            sb.AppendLine("Audit Entries: " + (auditLog != null ? auditLog.Count : 0));
 
             return sb.ToString();
         }

@@ -211,7 +211,21 @@ namespace ScenariumAPI
                 _data.SelectedItemId = "OVERVIEW";
                 _hud.Open();
 
-                AddMultilineEvent(_eventBus != null ? _eventBus.BuildRecentSummary(20) : "Event bus is not initialized.");
+                if (args.Length >= 3 && Eq(args[2], "clear"))
+                {
+                    if (_eventBus != null)
+                    {
+                        _eventBus.Clear();
+                        _eventBus.Publish(ScenariumEventType.EventsCleared, "Events", "Event log cleared.", "", "Cleared");
+                    }
+
+                    AddEvent("Scenarium event log cleared.");
+                }
+                else
+                {
+                    AddMultilineEvent(_eventBus != null ? _eventBus.BuildRecentSummary(20) : "Event bus is not initialized.");
+                }
+
                 SaveState();
                 _hud.Refresh(true);
                 return;
@@ -237,7 +251,7 @@ namespace ScenariumAPI
                 _data.SelectedItemId = "OVERVIEW";
                 _hud.Open();
 
-                AddMultilineEvent(_diagnostics != null ? _diagnostics.BuildRuntimeReport(_runtime, _mesBridge) : "Diagnostics are not initialized.");
+                AddMultilineEvent(_diagnostics != null ? _diagnostics.BuildRuntimeReport(_runtime, _mesBridge, _eventBus, _transitionAudit) : "Diagnostics are not initialized.");
                 SaveState();
                 _hud.Refresh(true);
                 return;
@@ -251,6 +265,8 @@ namespace ScenariumAPI
                 _hud.Open();
 
                 AddMultilineEvent(_bindingValidator != null ? _bindingValidator.ValidateMesBindings(_runtime) : "Binding validator is not initialized.");
+                if (_eventBus != null)
+                    _eventBus.Publish(ScenariumEventType.ValidationCompleted, "MESBindings", "MES binding validation completed.", "", "Complete");
                 SaveState();
                 _hud.Refresh(true);
                 return;
@@ -569,6 +585,8 @@ namespace ScenariumAPI
             if (args.Length == 2 || Eq(args[2], "refresh"))
             {
                 _mesBridge.Refresh();
+                if (_eventBus != null)
+                    _eventBus.Publish(ScenariumEventType.MesPermissionsRefreshed, "MES", "MES permissions refreshed.", "", "Refreshed");
                 if (_mesExporter != null)
                     _mesExporter.Export(_mesBridge.Snapshot);
                 AddMultilineEvent(_mesBridge.BuildSummary(false, false));
@@ -616,6 +634,10 @@ namespace ScenariumAPI
             if (!result.Allowed)
             {
                 AddEvent("DENIED | " + nodeId + " | " + result.Reason);
+
+                if (_eventBus != null)
+                    _eventBus.Publish(ScenariumEventType.TransitionDenied, nodeId, result.Reason, result.PreviousState, result.NewState);
+
                 return;
             }
 
@@ -631,6 +653,9 @@ namespace ScenariumAPI
 
             if (_transitionAudit != null)
                 _transitionAudit.Record(result);
+
+            if (_eventBus != null && result.Forced)
+                _eventBus.Publish(ScenariumEventType.TransitionForced, nodeId, "Admin force transition applied.", result.PreviousState, result.NewState);
 
             AddEvent((result.Forced ? "FORCED" : "ALLOW") + " | " + nodeId + " | " + result.PreviousState + " -> " + result.NewState);
         }
@@ -816,6 +841,9 @@ namespace ScenariumAPI
             _ignorePersistedRuntimeStateOnce = true;
 
             AddEvent("Runtime state cleared.");
+            if (_eventBus != null)
+                _eventBus.Publish(ScenariumEventType.RuntimeReset, "Runtime", "Runtime state reset.", "", "Reset");
+
             TryReloadCampaign();
 
             if (_mesBridge != null)

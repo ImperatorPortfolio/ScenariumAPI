@@ -12,7 +12,10 @@ namespace ScenariumAPI.Events
         NodeRevealed = 102,
         FactionDefeated = 200,
         MesPermissionsRefreshed = 300,
-        ValidationCompleted = 400
+        ValidationCompleted = 400,
+        TransitionDenied = 500,
+        TransitionForced = 501,
+        EventsCleared = 600
     }
 
     public class ScenariumEventData

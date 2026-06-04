@@ -20,6 +20,11 @@ namespace ScenariumAPI.Events
             get { return _events; }
         }
 
+        public int Count
+        {
+            get { return _events.Count; }
+        }
+
         public ScenariumEventData Publish(ScenariumEventType type, string subjectId, string message, string previousState, string newState)
         {
             ScenariumEventData data = new ScenariumEventData();
