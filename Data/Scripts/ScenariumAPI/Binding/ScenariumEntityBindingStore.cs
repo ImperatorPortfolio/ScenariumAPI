@@ -1,79 +1,82 @@
-using Sandbox.ModAPI;
-using VRage.Utils;
-using System;
-using System.IO;
 using System.Collections.Generic;
+using System.Text;
 
 namespace ScenariumAPI.Binding
 {
     public class ScenariumEntityBindingStore
     {
-        const string SaveFile = "ScenariumAPI_EntityBindings.xml";
-        readonly Action<string> _log;
+        readonly Dictionary<long, ScenariumEntityBindingData> _bindings = new Dictionary<long, ScenariumEntityBindingData>();
 
-        public ScenariumEntityBindingStore(Action<string> log)
+        public int Count
         {
-            _log = log;
+            get { return _bindings.Count; }
         }
 
-        public ScenariumEntityBindingSaveData Load()
+        public IEnumerable<ScenariumEntityBindingData> Bindings
         {
-            try
-            {
-                ScenariumEntityBindingSaveData data = new ScenariumEntityBindingSaveData();
-                data.EnsureCollections();
-
-                if (MyAPIGateway.Utilities == null)
-                    return data;
-
-                if (!MyAPIGateway.Utilities.FileExistsInWorldStorage(SaveFile, typeof(ScenariumEntityBindingStore)))
-                    return data;
-
-                TextReader reader = MyAPIGateway.Utilities.ReadFileInWorldStorage(SaveFile, typeof(ScenariumEntityBindingStore));
-                string xml = reader.ReadToEnd();
-                reader.Close();
-
-                if (string.IsNullOrWhiteSpace(xml))
-                    return data;
-
-                data = MyAPIGateway.Utilities.SerializeFromXML<ScenariumEntityBindingSaveData>(xml);
-
-                if (data == null)
-                    data = new ScenariumEntityBindingSaveData();
-
-                data.EnsureCollections();
-                return data;
-            }
-            catch (Exception e)
-            {
-                MyLog.Default.WriteLineAndConsole("Scenarium entity binding load failed: " + e);
-                if (_log != null)
-                    _log("Entity binding load failed: " + e.Message);
-                ScenariumEntityBindingSaveData data = new ScenariumEntityBindingSaveData();
-                data.EnsureCollections();
-                return data;
-            }
+            get { return _bindings.Values; }
         }
 
-        public void Save(ScenariumEntityBindingSaveData data)
+        public bool Contains(long entityId)
         {
-            try
-            {
-                if (MyAPIGateway.Utilities == null || data == null)
-                    return;
+            return _bindings.ContainsKey(entityId);
+        }
 
-                data.EnsureCollections();
-                string xml = MyAPIGateway.Utilities.SerializeToXML(data);
-                TextWriter writer = MyAPIGateway.Utilities.WriteFileInWorldStorage(SaveFile, typeof(ScenariumEntityBindingStore));
-                writer.Write(xml);
-                writer.Close();
-            }
-            catch (Exception e)
+        public void Bind(long entityId, string nodeId, string spawnGroup, string gridName)
+        {
+            ScenariumEntityBindingData data;
+            if (!_bindings.TryGetValue(entityId, out data))
             {
-                MyLog.Default.WriteLineAndConsole("Scenarium entity binding save failed: " + e);
-                if (_log != null)
-                    _log("Entity binding save failed: " + e.Message);
+                data = new ScenariumEntityBindingData();
+                data.EntityId = entityId;
+                _bindings[entityId] = data;
             }
+
+            data.NodeId = nodeId;
+            data.SpawnGroup = spawnGroup;
+            data.GridName = gridName;
+            data.Closed = false;
+            data.TransitionApplied = false;
+        }
+
+        public bool Unbind(long entityId)
+        {
+            return _bindings.Remove(entityId);
+        }
+
+        public ScenariumEntityBindingData Get(long entityId)
+        {
+            ScenariumEntityBindingData data;
+            _bindings.TryGetValue(entityId, out data);
+            return data;
+        }
+
+        public void Clear()
+        {
+            _bindings.Clear();
+        }
+
+        public string BuildSummary()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            if (_bindings.Count == 0)
+            {
+                sb.AppendLine("No persisted Scenarium entity bindings.");
+                return sb.ToString();
+            }
+
+            foreach (ScenariumEntityBindingData binding in _bindings.Values)
+            {
+                sb.AppendLine(binding.EntityId +
+                    " | Node=" + binding.NodeId +
+                    " | SpawnGroup=" + binding.SpawnGroup +
+                    " | Grid=" + binding.GridName +
+                    " | " + (binding.Closed ? "Closed" : "Open") +
+                    " | " + (binding.TransitionApplied ? "Applied" : "Pending"));
+            }
+
+            return sb.ToString();
         }
     }
 }
