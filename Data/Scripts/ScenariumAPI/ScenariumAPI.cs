@@ -63,14 +63,14 @@ namespace ScenariumAPI
             _runtimePersistence = new ScenariumPersistence();
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
-            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
+            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
-            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
+            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
@@ -668,7 +668,7 @@ namespace ScenariumAPI
         void HandlePersistentBindCommand(string[] args)
         {
             if (_entityBinding == null)
-                _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
+                _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
 
             if (args.Length == 2 || Eq(args[2], "diagnose"))
             {
@@ -914,7 +914,7 @@ namespace ScenariumAPI
             _runtime = new CampaignRuntime(AddEvent);
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
-            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, RunValidatedNodeTransition, AddEvent);
+            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
