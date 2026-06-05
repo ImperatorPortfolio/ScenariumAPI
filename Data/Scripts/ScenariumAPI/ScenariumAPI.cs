@@ -70,11 +70,6 @@ namespace ScenariumAPI
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
-            _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
-            _transitionValidator = new NodeTransitionValidator(_runtime);
-            _transitionAudit = new TransitionAuditLog();
-            _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
-            _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
             _transitionAudit = new TransitionAuditLog();
 
@@ -528,9 +523,12 @@ namespace ScenariumAPI
 
             _queryApi.SetRuntime(_runtime);
             if (_mesBridge != null)
+            {
                 _mesBridge.Refresh();
+
                 if (_mesExporter != null)
                     _mesExporter.Export(_mesBridge.Snapshot);
+            }
 
             if (_eventBus != null)
                 _eventBus.Publish(ScenariumEventType.CampaignLoaded, campaign.CampaignId, "Campaign loaded.", "", campaign.InitialState.ToString());
@@ -917,10 +915,6 @@ namespace ScenariumAPI
             _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
-            _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
-            _bindingValidator = new CampaignBindingValidator();
-            _transitionValidator = new NodeTransitionValidator(_runtime);
-            _transitionAudit = new TransitionAuditLog();
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
