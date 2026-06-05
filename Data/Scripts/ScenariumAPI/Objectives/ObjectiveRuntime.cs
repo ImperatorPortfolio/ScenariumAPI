@@ -55,7 +55,7 @@ namespace ScenariumAPI.Objectives
 
             foreach (IMySlimBlock slim in blocks)
             {
-                IMyTerminalBlock terminal = slim.FatBlock as IMyTerminalBlock;
+                Sandbox.ModAPI.IMyTerminalBlock terminal = slim.FatBlock as Sandbox.ModAPI.IMyTerminalBlock;
                 if (terminal == null)
                     continue;
 

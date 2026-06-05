@@ -801,7 +801,7 @@ namespace ScenariumAPI
                 if (request == null || string.IsNullOrWhiteSpace(request.NodeId))
                     continue;
 
-                ObjectiveData objective = new ObjectiveData();
+                ScenariumAPI.Objectives.ObjectiveData objective = new ScenariumAPI.Objectives.ObjectiveData();
                 objective.NodeId = request.NodeId;
                 objective.ObjectiveId = request.NodeId + "_CONTROL";
                 objective.ObjectiveType = "ControlBlockDestroyed";
