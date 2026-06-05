@@ -18,7 +18,6 @@ using ScenariumAPI.Events;
 using ScenariumAPI.Diagnostics;
 using ScenariumAPI.Progression;
 using ScenariumAPI.Binding;
-using ScenariumAPI.UI;
 using ScenariumAPI.Objectives;
 
 namespace ScenariumAPI

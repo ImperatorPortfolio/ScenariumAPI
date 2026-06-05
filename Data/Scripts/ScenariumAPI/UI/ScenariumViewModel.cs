@@ -1,206 +1,215 @@
+using System.Collections.Generic;
 using System.Text;
 using ScenariumAPI.Runtime;
 using ScenariumAPI.Data;
 
-namespace ScenariumAPI.UI
+public class ScenariumViewModel
 {
-    public class ScenariumViewModel
+    // Existing HUD contract fields
+    public int Version = 91;
+    public string CampaignDisplayName = "No Campaign";
+    public string CampaignState = "Unknown";
+    public string CurrentSectorId = "Unknown";
+    public List<string> FactionLines = new List<string>();
+    public List<string> NodeLines = new List<string>();
+
+    // Runtime summary fields
+    public string CampaignTitle = "No Campaign";
+    public string ScenarioTitle = "No Scenario";
+    public string ScenarioSummary = "";
+    public string QuestSummary = "";
+    public string RecentActivity = "";
+    public string ObjectiveSummary = "";
+
+    public static ScenariumViewModel FromRuntime(CampaignRuntime runtime)
     {
-        public string CampaignTitle = "No Campaign";
-        public string ScenarioTitle = "No Scenario";
-        public string ScenarioSummary = "";
-        public string QuestSummary = "";
-        public string RecentActivity = "";
-        public string ObjectiveSummary = "";
+        ScenariumViewModel vm = new ScenariumViewModel();
 
-        public static ScenariumViewModel FromRuntime(CampaignRuntime runtime)
+        if (runtime == null || runtime.Campaign == null)
         {
-            ScenariumViewModel vm = new ScenariumViewModel();
-
-            if (runtime == null || runtime.Campaign == null)
-            {
-                vm.CampaignTitle = "No Campaign Loaded";
-                vm.ScenarioTitle = "No Active Scenario";
-                vm.ScenarioSummary = "Campaign runtime is not loaded.";
-                vm.QuestSummary = "No quest data available.";
-                vm.ObjectiveSummary = "No active objective.";
-                return vm;
-            }
-
-            vm.CampaignTitle = string.IsNullOrWhiteSpace(runtime.Campaign.DisplayName) ? runtime.Campaign.CampaignId : runtime.Campaign.DisplayName;
-            vm.ScenarioTitle = BuildScenarioTitle(runtime);
-            vm.ScenarioSummary = BuildScenarioSummary(runtime);
-            vm.QuestSummary = BuildQuestSummary(runtime);
-            vm.ObjectiveSummary = BuildObjectiveSummary(runtime);
-            vm.RecentActivity = BuildRecentActivity(runtime);
-
+            vm.CampaignDisplayName = "No Campaign Loaded";
+            vm.CampaignTitle = vm.CampaignDisplayName;
+            vm.ScenarioTitle = "No Active Scenario";
+            vm.CampaignState = "Not Loaded";
+            vm.CurrentSectorId = "Unknown";
+            vm.ScenarioSummary = "Campaign runtime is not loaded.";
+            vm.QuestSummary = "No active objective.";
+            vm.ObjectiveSummary = "No objective data.";
+            vm.RecentActivity = "Waiting for campaign.";
+            vm.FactionLines.Add("No faction data.");
+            vm.NodeLines.Add("No node data.");
             return vm;
         }
 
-        static string BuildScenarioTitle(CampaignRuntime runtime)
-        {
-            if (runtime.Campaign.Scenarios != null && runtime.Campaign.Scenarios.Count > 0)
-            {
-                ScenarioData scenario = runtime.Campaign.Scenarios[0];
-                return string.IsNullOrWhiteSpace(scenario.DisplayName) ? scenario.ScenarioId : scenario.DisplayName;
-            }
+        vm.CampaignDisplayName = Safe(runtime.Campaign.DisplayName, runtime.Campaign.CampaignId);
+        vm.CampaignTitle = vm.CampaignDisplayName;
+        vm.CampaignState = runtime.Campaign.InitialState.ToString();
+        vm.CurrentSectorId = Safe(runtime.Campaign.StartSectorId, "Unknown");
+        vm.ScenarioTitle = BuildScenarioTitle(runtime);
 
-            return runtime.Campaign.StartScenarioId ?? "Active Scenario";
+        BuildFactionLines(runtime, vm);
+        BuildNodeLines(runtime, vm);
+
+        vm.ScenarioSummary = BuildScenarioSummary(runtime, vm);
+        vm.QuestSummary = BuildQuestSummary(runtime);
+        vm.ObjectiveSummary = BuildObjectiveSummary(runtime);
+        vm.RecentActivity = "Runtime HUD data refreshed.";
+
+        return vm;
+    }
+
+    static string BuildScenarioTitle(CampaignRuntime runtime)
+    {
+        if (runtime.Campaign.Scenarios != null && runtime.Campaign.Scenarios.Count > 0)
+        {
+            ScenarioData scenario = runtime.Campaign.Scenarios[0];
+            return Safe(scenario.DisplayName, scenario.ScenarioId);
         }
 
-        static string BuildScenarioSummary(CampaignRuntime runtime)
+        return Safe(runtime.Campaign.StartScenarioId, "Active Scenario");
+    }
+
+    static void BuildFactionLines(CampaignRuntime runtime, ScenariumViewModel vm)
+    {
+        vm.FactionLines.Clear();
+
+        if (runtime.Campaign.Factions == null || runtime.Campaign.Factions.Count == 0)
         {
-            StringBuilder sb = new StringBuilder();
+            vm.FactionLines.Add("No faction data.");
+            return;
+        }
 
-            sb.AppendLine("Campaign: " + Safe(runtime.Campaign.DisplayName, runtime.Campaign.CampaignId));
-            sb.AppendLine("Version: " + Safe(runtime.Campaign.Version, "Unknown"));
-            sb.AppendLine("Sector: " + Safe(runtime.Campaign.StartSectorId, "Unknown"));
-            sb.AppendLine("");
+        foreach (FactionData faction in runtime.Campaign.Factions)
+        {
+            if (faction == null)
+                continue;
 
-            int hidden = 0;
-            int revealed = 0;
-            int destroyed = 0;
-            int captured = 0;
+            vm.FactionLines.Add(Safe(faction.Tag, faction.FactionId) + " | " + Safe(faction.DisplayName, faction.FactionId) + " | " + faction.InitialState.ToString());
+        }
+    }
 
-            if (runtime.State != null && runtime.State.Nodes != null)
+    static void BuildNodeLines(CampaignRuntime runtime, ScenariumViewModel vm)
+    {
+        vm.NodeLines.Clear();
+
+        if (runtime.Campaign.ConquestNodes == null || runtime.Campaign.ConquestNodes.Count == 0)
+        {
+            vm.NodeLines.Add("No node data.");
+            return;
+        }
+
+        foreach (ConquestNodeData node in runtime.Campaign.ConquestNodes)
+        {
+            if (node == null)
+                continue;
+
+            string mes = "";
+
+            if (node.Integrations != null)
             {
-                foreach (var node in runtime.State.Nodes)
+                foreach (IntegrationBindingData integration in node.Integrations)
                 {
-                    if (node == null)
+                    if (integration == null)
                         continue;
 
-                    string state = node.State.ToString();
-
-                    if (state == "Hidden")
-                        hidden++;
-                    else if (state == "Revealed")
-                        revealed++;
-                    else if (state == "Destroyed")
-                        destroyed++;
-                    else if (state == "Captured")
-                        captured++;
-                }
-            }
-
-            sb.AppendLine("Revealed: " + revealed);
-            sb.AppendLine("Hidden: " + hidden);
-            sb.AppendLine("Destroyed: " + destroyed);
-            sb.AppendLine("Captured: " + captured);
-
-            return sb.ToString();
-        }
-
-        static string BuildQuestSummary(CampaignRuntime runtime)
-        {
-            StringBuilder sb = new StringBuilder();
-
-            ConquestNodeRuntimeData active = GetFirstActiveNode(runtime);
-
-            if (active == null)
-            {
-                sb.AppendLine("No active conquest objective.");
-                sb.AppendLine("Campaign may be complete or waiting for new data.");
-                return sb.ToString();
-            }
-
-            ConquestNodeData data = FindNodeData(runtime, active.NodeId);
-
-            sb.AppendLine("Current Objective");
-            sb.AppendLine(Safe(data != null ? data.DisplayName : null, active.NodeId));
-            sb.AppendLine("");
-            sb.AppendLine("Task:");
-            sb.AppendLine("Destroy or capture the objective control point.");
-            sb.AppendLine("");
-            sb.AppendLine("State: " + active.State);
-
-            return sb.ToString();
-        }
-
-        static string BuildObjectiveSummary(CampaignRuntime runtime)
-        {
-            ConquestNodeRuntimeData active = GetFirstActiveNode(runtime);
-
-            if (active == null)
-                return "No active objective.";
-
-            ConquestNodeData data = FindNodeData(runtime, active.NodeId);
-
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine("Node: " + Safe(data != null ? data.DisplayName : null, active.NodeId));
-            sb.AppendLine("Node Id: " + active.NodeId);
-            sb.AppendLine("State: " + active.State);
-
-            if (data != null && data.Integrations != null)
-            {
-                foreach (var integration in data.Integrations)
-                {
-                    if (integration != null && integration.IntegrationType == "MES" && integration.BindingKey == "MES.SpawnGroup")
+                    if (integration.IntegrationType.ToString() == "MES" && integration.BindingKey == "MES.SpawnGroup")
                     {
-                        sb.AppendLine("MES: " + integration.BindingValue);
+                        mes = " | MES: " + integration.BindingValue;
                         break;
                     }
                 }
             }
 
-            sb.AppendLine("Marker: SCENARIUM_OBJECTIVE_CONTROL");
-            return sb.ToString();
+            vm.NodeLines.Add(Safe(node.DisplayName, node.NodeId) + " | " + node.InitialState.ToString() + mes);
         }
+    }
 
-        static string BuildRecentActivity(CampaignRuntime runtime)
+    static string BuildScenarioSummary(CampaignRuntime runtime, ScenariumViewModel vm)
+    {
+        StringBuilder sb = new StringBuilder();
+
+        sb.AppendLine("Campaign: " + vm.CampaignDisplayName);
+        sb.AppendLine("Version: " + Safe(runtime.Campaign.Version, "Unknown"));
+        sb.AppendLine("State: " + vm.CampaignState);
+        sb.AppendLine("Sector: " + vm.CurrentSectorId);
+        sb.AppendLine("Factions: " + vm.FactionLines.Count);
+        sb.AppendLine("Nodes: " + vm.NodeLines.Count);
+
+        return sb.ToString();
+    }
+
+    static string BuildQuestSummary(CampaignRuntime runtime)
+    {
+        ConquestNodeData node = GetFirstObjectiveNode(runtime);
+
+        if (node == null)
+            return "No campaign objective nodes found.";
+
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine("Current Campaign Objective");
+        sb.AppendLine(Safe(node.DisplayName, node.NodeId));
+        sb.AppendLine("");
+        sb.AppendLine("Task:");
+        sb.AppendLine("Destroy or capture the objective control point.");
+        sb.AppendLine("");
+        sb.AppendLine("Marker:");
+        sb.AppendLine("SCENARIUM_OBJECTIVE_CONTROL");
+
+        return sb.ToString();
+    }
+
+    static string BuildObjectiveSummary(CampaignRuntime runtime)
+    {
+        ConquestNodeData node = GetFirstObjectiveNode(runtime);
+
+        if (node == null)
+            return "No objective available.";
+
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine("Node Id: " + node.NodeId);
+        sb.AppendLine("Initial State: " + node.InitialState.ToString());
+        sb.AppendLine("Faction: " + Safe(node.FactionTag, "Unknown"));
+
+        if (node.Integrations != null)
         {
-            StringBuilder sb = new StringBuilder();
-
-            ConquestNodeRuntimeData active = GetFirstActiveNode(runtime);
-
-            if (active != null)
+            foreach (IntegrationBindingData integration in node.Integrations)
             {
-                sb.AppendLine("Active objective: " + active.NodeId);
-                sb.AppendLine("Waiting for objective marker completion.");
-            }
-            else
-            {
-                sb.AppendLine("No active revealed nodes.");
-            }
-
-            return sb.ToString();
-        }
-
-        static ConquestNodeRuntimeData GetFirstActiveNode(CampaignRuntime runtime)
-        {
-            if (runtime == null || runtime.State == null || runtime.State.Nodes == null)
-                return null;
-
-            foreach (var node in runtime.State.Nodes)
-            {
-                if (node == null)
+                if (integration == null)
                     continue;
 
-                string state = node.State.ToString();
-
-                if (state == "Revealed" || state == "Active")
-                    return node;
+                if (integration.IntegrationType.ToString() == "MES" && integration.BindingKey == "MES.SpawnGroup")
+                {
+                    sb.AppendLine("MES: " + integration.BindingValue);
+                    break;
+                }
             }
+        }
 
+        return sb.ToString();
+    }
+
+    static ConquestNodeData GetFirstObjectiveNode(CampaignRuntime runtime)
+    {
+        if (runtime == null || runtime.Campaign == null || runtime.Campaign.ConquestNodes == null)
             return null;
-        }
 
-        static ConquestNodeData FindNodeData(CampaignRuntime runtime, string nodeId)
+        foreach (ConquestNodeData node in runtime.Campaign.ConquestNodes)
         {
-            if (runtime == null || runtime.Campaign == null || runtime.Campaign.ConquestNodes == null)
-                return null;
+            if (node == null)
+                continue;
 
-            foreach (var node in runtime.Campaign.ConquestNodes)
-            {
-                if (node != null && node.NodeId == nodeId)
-                    return node;
-            }
-
-            return null;
+            if (node.InitialState.ToString() == "Revealed")
+                return node;
         }
 
-        static string Safe(string value, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(value) ? fallback : value;
-        }
+        if (runtime.Campaign.ConquestNodes.Count > 0)
+            return runtime.Campaign.ConquestNodes[0];
+
+        return null;
+    }
+
+    static string Safe(string value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
     }
 }

@@ -18,6 +18,13 @@ namespace ScenariumAPI.Integrations.MES
             get { return _pending; }
         }
 
+        public MesSpawnCommandBridge(MesSpawnRequestRuntime requests, MesApiClient mesApi, Action<string> log)
+        {
+            _requests = requests;
+            _mesApi = mesApi;
+            _log = log;
+        }
+
         public bool HasPendingForNode(string nodeId)
         {
             if (_pending == null || _pending.Consumed)
@@ -31,11 +38,9 @@ namespace ScenariumAPI.Integrations.MES
             return _pending != null && !_pending.Consumed;
         }
 
-        public MesSpawnCommandBridge(MesSpawnRequestRuntime requests, MesApiClient mesApi, Action<string> log)
+        public void ClearPending()
         {
-            _requests = requests;
-            _mesApi = mesApi;
-            _log = log;
+            _pending = null;
         }
 
         public bool RequestNext()
@@ -64,7 +69,6 @@ namespace ScenariumAPI.Integrations.MES
             Log("MES spawn bridge found no allowed spawn request.");
             return false;
         }
-
 
         public bool Request(MesSpawnRequestData request)
         {
@@ -126,36 +130,22 @@ namespace ScenariumAPI.Integrations.MES
                 return false;
             }
 
-            MatrixD matrix = GetSpawnMatrix();
+            Vector3D coords = GetSpawnCoords();
             List<string> groups = new List<string>();
             groups.Add(spawnGroup);
 
-            bool result = _mesApi.CustomSpawnRequest(
-                groups,
-                matrix,
-                Vector3.Zero,
-                true,
-                "UTD",
-                "ScenariumAPI"
-            );
+            bool result = _mesApi.SpawnPlanetaryInstallation(coords, groups);
 
-            Log("MES custom spawn request for " + spawnGroup + ": " + result);
+            Log("MES planetary installation spawn request for " + spawnGroup + ": " + result);
             return result;
         }
 
-        MatrixD GetSpawnMatrix()
+        Vector3D GetSpawnCoords()
         {
             if (MyAPIGateway.Session != null && MyAPIGateway.Session.Player != null)
-            {
-                Vector3D pos = MyAPIGateway.Session.Player.GetPosition();
-                Vector3D forward = MyAPIGateway.Session.Player.Character != null ? MyAPIGateway.Session.Player.Character.WorldMatrix.Forward : Vector3D.Forward;
-                Vector3D up = MyAPIGateway.Session.Player.Character != null ? MyAPIGateway.Session.Player.Character.WorldMatrix.Up : Vector3D.Up;
+                return MyAPIGateway.Session.Player.GetPosition();
 
-                Vector3D spawnPos = pos + forward * 1500;
-                return MatrixD.CreateWorld(spawnPos, forward, up);
-            }
-
-            return MatrixD.CreateWorld(Vector3D.Zero, Vector3D.Forward, Vector3D.Up);
+            return Vector3D.Zero;
         }
 
         void Log(string message)
