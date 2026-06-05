@@ -201,6 +201,22 @@ namespace ScenariumAPI
                 return;
             }
 
+            if (Eq(args[1], "version"))
+            {
+                _data.PanelVisible = true;
+                _data.PanelTab = "INTEL";
+                _data.SelectedItemId = "OVERVIEW";
+                _hud.Open();
+
+                AddEvent("ScenariumAPI version: 0.7.3c");
+                AddEvent("ScenariumHUD version: " + ScenariumHudService.HudVersion);
+                AddEvent("Module boundary: Core/UI split boundary active");
+
+                SaveState();
+                _hud.Refresh(true);
+                return;
+            }
+
             if (Eq(args[1], "bind"))
             {
                 _data.PanelVisible = true;
@@ -276,6 +292,9 @@ namespace ScenariumAPI
                 _hud.Open();
 
                 AddMultilineEvent(_diagnostics != null ? _diagnostics.BuildRuntimeReport(_runtime, _mesBridge, _eventBus, _transitionAudit) : "Diagnostics are not initialized.");
+                AddEvent("API Version: 0.7.3c");
+                AddEvent("HUD Version: " + ScenariumHudService.HudVersion);
+                AddEvent("Module Boundary: Core/UI split boundary active");
                 SaveState();
                 _hud.Refresh(true);
                 return;
