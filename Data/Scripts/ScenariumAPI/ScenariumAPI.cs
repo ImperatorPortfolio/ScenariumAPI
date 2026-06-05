@@ -18,6 +18,7 @@ using ScenariumAPI.Events;
 using ScenariumAPI.Diagnostics;
 using ScenariumAPI.Progression;
 using ScenariumAPI.Binding;
+using ScenariumAPI.UI;
 using ScenariumAPI.Objectives;
 
 namespace ScenariumAPI
@@ -682,6 +683,15 @@ namespace ScenariumAPI
         }
 
 
+
+        void RefreshHudRuntimeView()
+        {
+            UpdateHudViewModel();
+
+            if (_hud != null)
+                _hud.Refresh(true);
+        }
+
         void UpdateHudViewModel()
         {
             if (_hud != null)
@@ -932,7 +942,7 @@ namespace ScenariumAPI
             _autoSpawnCooldownTicks = 0;
 
             AddEvent("MES successful spawn bound: " + grid.DisplayName + " -> " + pending.NodeId);
-            UpdateHudViewModel();
+            RefreshHudRuntimeView();
             SaveState();
         }
 
