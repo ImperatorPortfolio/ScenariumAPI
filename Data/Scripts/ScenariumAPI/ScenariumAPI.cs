@@ -50,6 +50,8 @@ namespace ScenariumAPI
         bool _ignorePersistedRuntimeStateOnce;
         ScenariumEntityBindingRuntime _entityBinding;
         bool _mesSpawnCallbackRegistered;
+        int _autoSpawnCooldownTicks;
+        const int AutoSpawnRetryCooldownTicks = 1800;
 
         public override void LoadData()
         {
@@ -118,11 +120,16 @@ namespace ScenariumAPI
                     _runtime.RestoreState(restoredState);
                     AddEvent("Persisted runtime state restored.");
                 }
+
+                TryAutoSpawnNextObjective("campaign load");
             }
 
             _tick++;
 
             HandleKeyboardInput();
+
+            if (_autoSpawnCooldownTicks > 0)
+                _autoSpawnCooldownTicks--;
 
             if (_mesApi != null && !_mesApi.Ready && _tick % 120 == 0)
                 _mesApi.UpdateHandshake();
@@ -141,6 +148,9 @@ namespace ScenariumAPI
                 _nodeDetection.Update();
                 UpdateHudViewModel();
             }
+
+            if (_mesApi != null && _mesApi.Ready && _tick % 600 == 0)
+                TryAutoSpawnNextObjective("periodic update");
 
             if (_hud != null && _tick % 30 == 0)
                 _hud.Refresh(false);
@@ -636,6 +646,65 @@ namespace ScenariumAPI
 
 
 
+
+        void TryAutoSpawnNextObjective(string reason)
+        {
+            if (_runtime == null || _runtime.Campaign == null)
+                return;
+
+            if (_mesSpawnRequests == null)
+                _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
+
+            if (_mesApi == null)
+                _mesApi = new MesApiClient(AddEvent);
+
+            if (_mesSpawnBridge == null)
+                _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
+
+            if (_entityBinding == null)
+                _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
+
+            RegisterMesSpawnCallback();
+
+            if (_mesApi == null || !_mesApi.Ready)
+            {
+                AddEvent("Auto objective spawn waiting for MES API. Reason: " + reason);
+                return;
+            }
+
+            if (_autoSpawnCooldownTicks > 0)
+                return;
+
+            _mesSpawnRequests.RefreshAndExport();
+
+            foreach (MesSpawnRequestData request in _mesSpawnRequests.Store.Requests)
+            {
+                if (request == null || !request.Allowed)
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(request.NodeId))
+                    continue;
+
+                if (_entityBinding.HasOpenBindingForNode(request.NodeId))
+                    return;
+
+                if (_mesSpawnBridge.HasPendingForNode(request.NodeId))
+                    return;
+
+                bool spawned = _mesSpawnBridge.Request(request);
+
+                if (!spawned)
+                {
+                    _autoSpawnCooldownTicks = AutoSpawnRetryCooldownTicks;
+                    AddEvent("Auto objective spawn request failed for " + request.NodeId + ". Retry cooldown started.");
+                    return;
+                }
+
+                AddEvent("Auto objective spawn requested for " + request.NodeId + ". Reason: " + reason);
+                return;
+            }
+        }
+
         void RegisterMesSpawnCallback()
         {
             if (_mesSpawnCallbackRegistered)
@@ -676,6 +745,7 @@ namespace ScenariumAPI
 
             _entityBinding.BindFromMesSpawn(grid.EntityId, pending.NodeId, pending.SpawnGroup, grid.DisplayName);
             pending.Consumed = true;
+            _autoSpawnCooldownTicks = 0;
 
             AddEvent("MES successful spawn bound: " + grid.DisplayName + " -> " + pending.NodeId);
             UpdateHudViewModel();
@@ -856,6 +926,8 @@ namespace ScenariumAPI
 
             if (_mesSpawnRequests != null)
                 _mesSpawnRequests.RefreshAndExport();
+
+            TryAutoSpawnNextObjective("node transition");
 
             AddEvent((result.Forced ? "FORCED" : "ALLOW") + " | " + nodeId + " | " + result.PreviousState + " -> " + result.NewState);
         }
@@ -1065,6 +1137,8 @@ namespace ScenariumAPI
                 _hud.Open();
                 _hud.Refresh(true);
             }
+
+            TryAutoSpawnNextObjective("reset");
 
             SaveState();
             AddEvent("Scenarium campaign reset complete.");

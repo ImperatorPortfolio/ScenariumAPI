@@ -7,19 +7,28 @@ namespace ScenariumAPI.Binding
     {
         readonly Dictionary<long, ScenariumEntityBindingData> _bindings = new Dictionary<long, ScenariumEntityBindingData>();
 
-        public int Count
-        {
-            get { return _bindings.Count; }
-        }
+        public int Count { get { return _bindings.Count; } }
+        public IEnumerable<ScenariumEntityBindingData> Bindings { get { return _bindings.Values; } }
+        public bool Contains(long entityId) { return _bindings.ContainsKey(entityId); }
 
-        public IEnumerable<ScenariumEntityBindingData> Bindings
+        public bool HasOpenBindingForNode(string nodeId)
         {
-            get { return _bindings.Values; }
-        }
+            if (string.IsNullOrWhiteSpace(nodeId))
+                return false;
 
-        public bool Contains(long entityId)
-        {
-            return _bindings.ContainsKey(entityId);
+            foreach (ScenariumEntityBindingData binding in _bindings.Values)
+            {
+                if (binding == null)
+                    continue;
+
+                if (binding.Closed || binding.TransitionApplied)
+                    continue;
+
+                if (string.Equals(binding.NodeId, nodeId, System.StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         public void Bind(long entityId, string nodeId, string spawnGroup, string gridName)
@@ -39,44 +48,8 @@ namespace ScenariumAPI.Binding
             data.TransitionApplied = false;
         }
 
-        public bool Unbind(long entityId)
-        {
-            return _bindings.Remove(entityId);
-        }
-
-        public ScenariumEntityBindingData Get(long entityId)
-        {
-            ScenariumEntityBindingData data;
-            _bindings.TryGetValue(entityId, out data);
-            return data;
-        }
-
-        public void Clear()
-        {
-            _bindings.Clear();
-        }
-
-        public string BuildSummary()
-        {
-            StringBuilder sb = new StringBuilder();
-
-            if (_bindings.Count == 0)
-            {
-                sb.AppendLine("No persisted Scenarium entity bindings.");
-                return sb.ToString();
-            }
-
-            foreach (ScenariumEntityBindingData binding in _bindings.Values)
-            {
-                sb.AppendLine(binding.EntityId +
-                    " | Node=" + binding.NodeId +
-                    " | SpawnGroup=" + binding.SpawnGroup +
-                    " | Grid=" + binding.GridName +
-                    " | " + (binding.Closed ? "Closed" : "Open") +
-                    " | " + (binding.TransitionApplied ? "Applied" : "Pending"));
-            }
-
-            return sb.ToString();
-        }
+        public bool Unbind(long entityId) { return _bindings.Remove(entityId); }
+        public void Clear() { _bindings.Clear(); }
+        public string BuildSummary() { return "Bindings: " + _bindings.Count; }
     }
 }

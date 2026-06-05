@@ -18,6 +18,19 @@ namespace ScenariumAPI.Integrations.MES
             get { return _pending; }
         }
 
+        public bool HasPendingForNode(string nodeId)
+        {
+            if (_pending == null || _pending.Consumed)
+                return false;
+
+            return string.Equals(_pending.NodeId, nodeId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public void ClearPending()
+        {
+            _pending = null;
+        }
+
         public MesSpawnCommandBridge(MesSpawnRequestRuntime requests, MesApiClient mesApi, Action<string> log)
         {
             _requests = requests;
