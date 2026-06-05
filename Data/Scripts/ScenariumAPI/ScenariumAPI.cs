@@ -37,6 +37,8 @@ namespace ScenariumAPI
         NodeDetectionRuntime _nodeDetection;
         MesBindingBridge _mesBridge;
         MesPermissionExporter _mesExporter;
+        MesSpawnRequestRuntime _mesSpawnRequests;
+        MesSpawnCommandBridge _mesSpawnBridge;
         ScenariumDataValidationResult _lastValidation;
         ScenariumEventBus _eventBus;
         ScenariumDiagnostics _diagnostics;
@@ -66,6 +68,8 @@ namespace ScenariumAPI
             _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
+            _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
+            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
@@ -528,6 +532,9 @@ namespace ScenariumAPI
 
                 if (_mesExporter != null)
                     _mesExporter.Export(_mesBridge.Snapshot);
+
+                if (_mesSpawnRequests != null)
+                    _mesSpawnRequests.RefreshAndExport();
             }
 
             if (_eventBus != null)
@@ -652,13 +659,25 @@ namespace ScenariumAPI
                 return;
             }
 
-            if (Eq(args[2], "can") && args.Length >= 4)
+            if (Eq(args[2], "requests"))
             {
-                AddEvent("MES spawn allowed for " + args[3] + ": " + _mesBridge.IsSpawnAllowed(args[3]));
+                if (_mesSpawnRequests == null)
+                    _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
+            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, AddEvent);
+
+                _mesSpawnRequests.RefreshAndExport();
+                AddMultilineEvent(_mesSpawnRequests.BuildSummary());
                 return;
             }
 
-            AddEvent("MES commands: /scen mes refresh | nodes | allowed | denied | can <spawnGroup>");
+            if (Eq(args[2], "can") && args.Length >= 4)
+            {
+                bool allowed = _mesSpawnRequests != null ? _mesSpawnRequests.IsAllowed(args[3]) : _mesBridge.IsSpawnAllowed(args[3]);
+                AddEvent("MES spawn allowed for " + args[3] + ": " + allowed);
+                return;
+            }
+
+            AddEvent("MES commands: /scen mes refresh | nodes | allowed | denied | requests | spawn next | spawn <spawnGroup> | can <spawnGroup>");
         }
 
 
@@ -741,6 +760,9 @@ namespace ScenariumAPI
 
             if (_eventBus != null && result.Forced)
                 _eventBus.Publish(ScenariumEventType.TransitionForced, nodeId, "Admin force transition applied.", result.PreviousState, result.NewState);
+
+            if (_mesSpawnRequests != null)
+                _mesSpawnRequests.RefreshAndExport();
 
             AddEvent((result.Forced ? "FORCED" : "ALLOW") + " | " + nodeId + " | " + result.PreviousState + " -> " + result.NewState);
         }
@@ -915,6 +937,8 @@ namespace ScenariumAPI
             _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
+            _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
+            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
@@ -934,6 +958,9 @@ namespace ScenariumAPI
 
                 if (_mesExporter != null)
                     _mesExporter.Export(_mesBridge.Snapshot);
+
+                if (_mesSpawnRequests != null)
+                    _mesSpawnRequests.RefreshAndExport();
             }
 
             UpdateHudViewModel();
