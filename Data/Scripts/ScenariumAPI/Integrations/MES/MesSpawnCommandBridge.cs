@@ -11,6 +11,13 @@ namespace ScenariumAPI.Integrations.MES
         readonly MesApiClient _mesApi;
         readonly Action<string> _log;
 
+        MesPendingSpawnRequest _pending;
+
+        public MesPendingSpawnRequest Pending
+        {
+            get { return _pending; }
+        }
+
         public MesSpawnCommandBridge(MesSpawnRequestRuntime requests, MesApiClient mesApi, Action<string> log)
         {
             _requests = requests;
@@ -38,11 +45,44 @@ namespace ScenariumAPI.Integrations.MES
                 if (string.IsNullOrWhiteSpace(spawnGroup))
                     continue;
 
-                return Request(spawnGroup);
+                return Request(request);
             }
 
             Log("MES spawn bridge found no allowed spawn request.");
             return false;
+        }
+
+
+        public bool Request(MesSpawnRequestData request)
+        {
+            if (request == null)
+            {
+                Log("MES spawn bridge failed: request data is null.");
+                return false;
+            }
+
+            string spawnGroup = !string.IsNullOrWhiteSpace(request.SpawnGroup) ? request.SpawnGroup : request.EncounterTag;
+
+            if (string.IsNullOrWhiteSpace(spawnGroup))
+            {
+                Log("MES spawn bridge failed: request has no spawn group.");
+                return false;
+            }
+
+            bool result = Request(spawnGroup);
+
+            if (result)
+            {
+                _pending = new MesPendingSpawnRequest();
+                _pending.SpawnGroup = spawnGroup;
+                _pending.NodeId = request.NodeId;
+                _pending.EncounterTag = request.EncounterTag;
+                _pending.Consumed = false;
+
+                Log("Scenarium pending MES spawn: " + spawnGroup + " -> " + request.NodeId);
+            }
+
+            return result;
         }
 
         public bool Request(string spawnGroup)

@@ -49,6 +49,7 @@ namespace ScenariumAPI
         TransitionAuditLog _transitionAudit;
         bool _ignorePersistedRuntimeStateOnce;
         ScenariumEntityBindingRuntime _entityBinding;
+        bool _mesSpawnCallbackRegistered;
 
         public override void LoadData()
         {
@@ -72,6 +73,7 @@ namespace ScenariumAPI
             _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
             _mesApi = new MesApiClient(AddEvent);
             _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
+            RegisterMesSpawnCallback();
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
@@ -124,6 +126,9 @@ namespace ScenariumAPI
 
             if (_mesApi != null && !_mesApi.Ready && _tick % 120 == 0)
                 _mesApi.UpdateHandshake();
+
+            if (_mesApi != null && _mesApi.Ready && !_mesSpawnCallbackRegistered)
+                RegisterMesSpawnCallback();
 
             if (_entityBinding != null && _tick % 120 == 0)
             {
@@ -630,6 +635,53 @@ namespace ScenariumAPI
         }
 
 
+
+        void RegisterMesSpawnCallback()
+        {
+            if (_mesSpawnCallbackRegistered)
+                return;
+
+            if (_mesApi == null || !_mesApi.Ready)
+                return;
+
+            _mesApi.RegisterSuccessfulSpawnAction(OnMesSuccessfulSpawn, true);
+            _mesSpawnCallbackRegistered = true;
+            AddEvent("MES successful-spawn callback registered.");
+        }
+
+        void OnMesSuccessfulSpawn(VRage.Game.ModAPI.IMyCubeGrid grid)
+        {
+            if (grid == null)
+            {
+                AddEvent("MES successful spawn callback received null grid.");
+                return;
+            }
+
+            if (_mesSpawnBridge == null || _mesSpawnBridge.Pending == null)
+            {
+                AddEvent("MES successful spawn received but no Scenarium pending request exists: " + grid.DisplayName);
+                return;
+            }
+
+            MesPendingSpawnRequest pending = _mesSpawnBridge.Pending;
+
+            if (pending.Consumed)
+            {
+                AddEvent("MES successful spawn received but pending request was already consumed: " + grid.DisplayName);
+                return;
+            }
+
+            if (_entityBinding == null)
+                _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
+
+            _entityBinding.BindFromMesSpawn(grid.EntityId, pending.NodeId, pending.SpawnGroup, grid.DisplayName);
+            pending.Consumed = true;
+
+            AddEvent("MES successful spawn bound: " + grid.DisplayName + " -> " + pending.NodeId);
+            UpdateHudViewModel();
+            SaveState();
+        }
+
         void HandleMesCommand(string[] args)
         {
             if (_mesBridge == null)
@@ -673,6 +725,7 @@ namespace ScenariumAPI
                     _mesApi = new MesApiClient(AddEvent);
 
                 _mesApi.UpdateHandshake();
+                RegisterMesSpawnCallback();
                 AddEvent(_mesApi.BuildStatus());
                 return;
             }
@@ -685,6 +738,7 @@ namespace ScenariumAPI
                 if (_mesSpawnBridge == null)
                     _mesApi = new MesApiClient(AddEvent);
             _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
+            RegisterMesSpawnCallback();
 
                 if (Eq(args[3], "next"))
                     _mesSpawnBridge.RequestNext();
@@ -702,6 +756,7 @@ namespace ScenariumAPI
                 if (_mesSpawnBridge == null)
                     _mesApi = new MesApiClient(AddEvent);
             _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
+            RegisterMesSpawnCallback();
 
                 _mesSpawnRequests.RefreshAndExport();
                 AddMultilineEvent(_mesSpawnRequests.BuildSummary());
@@ -978,6 +1033,7 @@ namespace ScenariumAPI
             _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
             _mesApi = new MesApiClient(AddEvent);
             _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
+            RegisterMesSpawnCallback();
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
