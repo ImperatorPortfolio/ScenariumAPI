@@ -26,9 +26,9 @@ namespace ScenariumAPI.Integrations.MES
             return string.Equals(_pending.NodeId, nodeId, StringComparison.OrdinalIgnoreCase);
         }
 
-        public void ClearPending()
+        public bool HasAnyPending()
         {
-            _pending = null;
+            return _pending != null && !_pending.Consumed;
         }
 
         public MesSpawnCommandBridge(MesSpawnRequestRuntime requests, MesApiClient mesApi, Action<string> log)
@@ -82,18 +82,18 @@ namespace ScenariumAPI.Integrations.MES
                 return false;
             }
 
+            _pending = new MesPendingSpawnRequest();
+            _pending.SpawnGroup = spawnGroup;
+            _pending.NodeId = request.NodeId;
+            _pending.EncounterTag = request.EncounterTag;
+            _pending.Consumed = false;
+
+            Log("Scenarium pending MES spawn: " + spawnGroup + " -> " + request.NodeId);
+
             bool result = Request(spawnGroup);
 
-            if (result)
-            {
-                _pending = new MesPendingSpawnRequest();
-                _pending.SpawnGroup = spawnGroup;
-                _pending.NodeId = request.NodeId;
-                _pending.EncounterTag = request.EncounterTag;
-                _pending.Consumed = false;
-
-                Log("Scenarium pending MES spawn: " + spawnGroup + " -> " + request.NodeId);
-            }
+            if (!result)
+                _pending = null;
 
             return result;
         }

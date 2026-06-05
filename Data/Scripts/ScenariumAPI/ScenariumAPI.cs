@@ -51,7 +51,11 @@ namespace ScenariumAPI
         ScenariumEntityBindingRuntime _entityBinding;
         bool _mesSpawnCallbackRegistered;
         int _autoSpawnCooldownTicks;
-        const int AutoSpawnRetryCooldownTicks = 1800;
+        const int AutoSpawnRetryCooldownTicks = 3600;
+        string _autoSpawnPendingNodeId;
+        string _autoSpawnPendingSpawnGroup;
+        int _autoSpawnPendingTicks;
+        const int AutoSpawnPendingTimeoutTicks = 7200;
 
         public override void LoadData()
         {
@@ -131,6 +135,20 @@ namespace ScenariumAPI
             if (_autoSpawnCooldownTicks > 0)
                 _autoSpawnCooldownTicks--;
 
+            if (!string.IsNullOrWhiteSpace(_autoSpawnPendingNodeId))
+            {
+                _autoSpawnPendingTicks++;
+
+                if (_autoSpawnPendingTicks > AutoSpawnPendingTimeoutTicks)
+                {
+                    AddEvent("Auto objective spawn pending timed out for " + _autoSpawnPendingNodeId + ". Retry cooldown started.");
+                    _autoSpawnPendingNodeId = null;
+                    _autoSpawnPendingSpawnGroup = null;
+                    _autoSpawnPendingTicks = 0;
+                    _autoSpawnCooldownTicks = AutoSpawnRetryCooldownTicks;
+                }
+            }
+
             if (_mesApi != null && !_mesApi.Ready && _tick % 120 == 0)
                 _mesApi.UpdateHandshake();
 
@@ -149,7 +167,7 @@ namespace ScenariumAPI
                 UpdateHudViewModel();
             }
 
-            if (_mesApi != null && _mesApi.Ready && _tick % 600 == 0)
+            if (_mesApi != null && _mesApi.Ready && _tick % 3600 == 0)
                 TryAutoSpawnNextObjective("periodic update");
 
             if (_hud != null && _tick % 30 == 0)
@@ -647,6 +665,49 @@ namespace ScenariumAPI
 
 
 
+
+        bool HasOpenBindingForNode(string nodeId)
+        {
+            if (string.IsNullOrWhiteSpace(nodeId))
+                return false;
+
+            if (_entityBinding == null)
+                return false;
+
+            string summary = _entityBinding.BuildSummary();
+
+            if (string.IsNullOrWhiteSpace(summary))
+                return false;
+
+            return summary.IndexOf("Node=" + nodeId, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   summary.IndexOf("Open", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+
+        bool HasAnyPendingAutoSpawn()
+        {
+            return !string.IsNullOrWhiteSpace(_autoSpawnPendingNodeId);
+        }
+
+        void MarkAutoSpawnPending(MesSpawnRequestData request)
+        {
+            if (request == null)
+                return;
+
+            string spawnGroup = !string.IsNullOrWhiteSpace(request.SpawnGroup) ? request.SpawnGroup : request.EncounterTag;
+
+            _autoSpawnPendingNodeId = request.NodeId;
+            _autoSpawnPendingSpawnGroup = spawnGroup;
+            _autoSpawnPendingTicks = 0;
+        }
+
+        void ClearAutoSpawnPending()
+        {
+            _autoSpawnPendingNodeId = null;
+            _autoSpawnPendingSpawnGroup = null;
+            _autoSpawnPendingTicks = 0;
+        }
+
         void TryAutoSpawnNextObjective(string reason)
         {
             if (_runtime == null || _runtime.Campaign == null)
@@ -665,6 +726,9 @@ namespace ScenariumAPI
                 _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
 
             RegisterMesSpawnCallback();
+
+            if (HasAnyPendingAutoSpawn())
+                return;
 
             if (_mesApi == null || !_mesApi.Ready)
             {
@@ -685,16 +749,18 @@ namespace ScenariumAPI
                 if (string.IsNullOrWhiteSpace(request.NodeId))
                     continue;
 
-                if (_entityBinding.HasOpenBindingForNode(request.NodeId))
+                if (HasOpenBindingForNode(request.NodeId))
                     return;
 
                 if (_mesSpawnBridge.HasPendingForNode(request.NodeId))
                     return;
 
+                MarkAutoSpawnPending(request);
                 bool spawned = _mesSpawnBridge.Request(request);
 
                 if (!spawned)
                 {
+                    ClearAutoSpawnPending();
                     _autoSpawnCooldownTicks = AutoSpawnRetryCooldownTicks;
                     AddEvent("Auto objective spawn request failed for " + request.NodeId + ". Retry cooldown started.");
                     return;
@@ -745,6 +811,7 @@ namespace ScenariumAPI
 
             _entityBinding.BindFromMesSpawn(grid.EntityId, pending.NodeId, pending.SpawnGroup, grid.DisplayName);
             pending.Consumed = true;
+            ClearAutoSpawnPending();
             _autoSpawnCooldownTicks = 0;
 
             AddEvent("MES successful spawn bound: " + grid.DisplayName + " -> " + pending.NodeId);
