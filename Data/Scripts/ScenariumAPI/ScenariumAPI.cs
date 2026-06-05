@@ -39,6 +39,7 @@ namespace ScenariumAPI
         MesPermissionExporter _mesExporter;
         MesSpawnRequestRuntime _mesSpawnRequests;
         MesSpawnCommandBridge _mesSpawnBridge;
+        MesApiClient _mesApi;
         ScenariumDataValidationResult _lastValidation;
         ScenariumEventBus _eventBus;
         ScenariumDiagnostics _diagnostics;
@@ -69,7 +70,8 @@ namespace ScenariumAPI
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
             _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
-            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, AddEvent);
+            _mesApi = new MesApiClient(AddEvent);
+            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);
@@ -89,6 +91,9 @@ namespace ScenariumAPI
 
             if (_runtime != null && _runtime.State != null && _runtimePersistence != null)
                 _runtimePersistence.SaveRuntimeState(_runtime.State);
+
+            if (_mesApi != null)
+                _mesApi.Close();
 
             if (_hud != null)
                 _hud.CloseAndDispose();
@@ -116,6 +121,9 @@ namespace ScenariumAPI
             _tick++;
 
             HandleKeyboardInput();
+
+            if (_mesApi != null && !_mesApi.Ready && _tick % 120 == 0)
+                _mesApi.UpdateHandshake();
 
             if (_entityBinding != null && _tick % 120 == 0)
             {
@@ -659,11 +667,41 @@ namespace ScenariumAPI
                 return;
             }
 
+            if (Eq(args[2], "api"))
+            {
+                if (_mesApi == null)
+                    _mesApi = new MesApiClient(AddEvent);
+
+                _mesApi.UpdateHandshake();
+                AddEvent(_mesApi.BuildStatus());
+                return;
+            }
+
+            if (Eq(args[2], "spawn") && args.Length >= 4)
+            {
+                if (_mesSpawnRequests == null)
+                    _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
+
+                if (_mesSpawnBridge == null)
+                    _mesApi = new MesApiClient(AddEvent);
+            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
+
+                if (Eq(args[3], "next"))
+                    _mesSpawnBridge.RequestNext();
+                else
+                    _mesSpawnBridge.Request(args[3]);
+
+                return;
+            }
+
             if (Eq(args[2], "requests"))
             {
                 if (_mesSpawnRequests == null)
                     _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
-            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, AddEvent);
+
+                if (_mesSpawnBridge == null)
+                    _mesApi = new MesApiClient(AddEvent);
+            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
 
                 _mesSpawnRequests.RefreshAndExport();
                 AddMultilineEvent(_mesSpawnRequests.BuildSummary());
@@ -677,7 +715,7 @@ namespace ScenariumAPI
                 return;
             }
 
-            AddEvent("MES commands: /scen mes refresh | nodes | allowed | denied | requests | spawn next | spawn <spawnGroup> | can <spawnGroup>");
+            AddEvent("MES commands: /scen mes refresh | nodes | allowed | denied | requests | api | spawn next | spawn <spawnGroup> | can <spawnGroup>");
         }
 
 
@@ -938,7 +976,8 @@ namespace ScenariumAPI
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
             _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
-            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, AddEvent);
+            _mesApi = new MesApiClient(AddEvent);
+            _mesSpawnBridge = new MesSpawnCommandBridge(_mesSpawnRequests, _mesApi, AddEvent);
             _consequences = new ConquestConsequenceRuntime(_runtime, _eventBus);
             _bindingValidator = new CampaignBindingValidator();
             _transitionValidator = new NodeTransitionValidator(_runtime);

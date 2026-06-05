@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using Sandbox.ModAPI;
-using VRage.Game.ModAPI;
 using VRageMath;
 
 namespace ScenariumAPI.Integrations.MES
@@ -8,11 +8,13 @@ namespace ScenariumAPI.Integrations.MES
     public class MesSpawnCommandBridge
     {
         readonly MesSpawnRequestRuntime _requests;
+        readonly MesApiClient _mesApi;
         readonly Action<string> _log;
 
-        public MesSpawnCommandBridge(MesSpawnRequestRuntime requests, Action<string> log)
+        public MesSpawnCommandBridge(MesSpawnRequestRuntime requests, MesApiClient mesApi, Action<string> log)
         {
             _requests = requests;
+            _mesApi = mesApi;
             _log = log;
         }
 
@@ -23,6 +25,8 @@ namespace ScenariumAPI.Integrations.MES
                 Log("MES spawn bridge failed: request runtime unavailable.");
                 return false;
             }
+
+            _requests.RefreshAndExport();
 
             foreach (MesSpawnRequestData request in _requests.Store.Requests)
             {
@@ -49,32 +53,42 @@ namespace ScenariumAPI.Integrations.MES
                 return false;
             }
 
-            if (_requests != null && !_requests.IsAllowed(spawnGroup))
+            if (_requests == null)
+            {
+                Log("MES spawn bridge failed: request runtime unavailable.");
+                return false;
+            }
+
+            _requests.RefreshAndExport();
+
+            if (!_requests.IsAllowed(spawnGroup))
             {
                 Log("MES spawn request denied by Scenarium state: " + spawnGroup);
                 return false;
             }
 
-            // MES does not expose a stable public compile-time API in this mod context.
-            // The production bridge is therefore state-driven:
-            // 1. Scenarium writes ScenariumAPI_MESSpawnRequests.xml.
-            // 2. MES/NPC data consumes that allowed request state.
-            // 3. This command marks/refreshes the active request and provides the handoff point.
-            _requests.RefreshAndExport();
+            if (_mesApi == null || !_mesApi.Ready)
+            {
+                Log("MES API is not ready. Spawn request not sent: " + spawnGroup);
+                return false;
+            }
 
-            BroadcastSpawnRequest(spawnGroup);
+            Vector3D coords = GetSpawnCoords();
+            List<string> groups = new List<string>();
+            groups.Add(spawnGroup);
 
-            Log("MES spawn requested through Scenarium bridge: " + spawnGroup);
-            Log("Spawn request exported for MES/NPC data consumption.");
-            return true;
+            bool result = _mesApi.SpawnPlanetaryInstallation(coords, groups);
+
+            Log("MES planetary installation spawn request for " + spawnGroup + ": " + result);
+            return result;
         }
 
-        void BroadcastSpawnRequest(string spawnGroup)
+        Vector3D GetSpawnCoords()
         {
-            // Kept intentionally as a local-state/export bridge.
-            // Do not directly spawn prefabs here; MES remains the spawning authority.
-            if (MyAPIGateway.Utilities != null)
-                MyAPIGateway.Utilities.ShowMessage("Scenarium", "MES spawn requested: " + spawnGroup);
+            if (MyAPIGateway.Session != null && MyAPIGateway.Session.Player != null)
+                return MyAPIGateway.Session.Player.GetPosition();
+
+            return Vector3D.Zero;
         }
 
         void Log(string message)
