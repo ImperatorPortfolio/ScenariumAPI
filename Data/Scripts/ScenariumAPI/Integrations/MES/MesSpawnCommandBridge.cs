@@ -73,22 +73,36 @@ namespace ScenariumAPI.Integrations.MES
                 return false;
             }
 
-            Vector3D coords = GetSpawnCoords();
+            MatrixD matrix = GetSpawnMatrix();
             List<string> groups = new List<string>();
             groups.Add(spawnGroup);
 
-            bool result = _mesApi.SpawnPlanetaryInstallation(coords, groups);
+            bool result = _mesApi.CustomSpawnRequest(
+                groups,
+                matrix,
+                Vector3.Zero,
+                true,
+                "UTD",
+                "ScenariumAPI"
+            );
 
-            Log("MES planetary installation spawn request for " + spawnGroup + ": " + result);
+            Log("MES custom spawn request for " + spawnGroup + ": " + result);
             return result;
         }
 
-        Vector3D GetSpawnCoords()
+        MatrixD GetSpawnMatrix()
         {
             if (MyAPIGateway.Session != null && MyAPIGateway.Session.Player != null)
-                return MyAPIGateway.Session.Player.GetPosition();
+            {
+                Vector3D pos = MyAPIGateway.Session.Player.GetPosition();
+                Vector3D forward = MyAPIGateway.Session.Player.Character != null ? MyAPIGateway.Session.Player.Character.WorldMatrix.Forward : Vector3D.Forward;
+                Vector3D up = MyAPIGateway.Session.Player.Character != null ? MyAPIGateway.Session.Player.Character.WorldMatrix.Up : Vector3D.Up;
 
-            return Vector3D.Zero;
+                Vector3D spawnPos = pos + forward * 1500;
+                return MatrixD.CreateWorld(spawnPos, forward, up);
+            }
+
+            return MatrixD.CreateWorld(Vector3D.Zero, Vector3D.Forward, Vector3D.Up);
         }
 
         void Log(string message)

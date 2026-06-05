@@ -17,6 +17,7 @@ namespace ScenariumAPI.Integrations.MES
         public string LastStatus;
 
         Func<Vector3D, List<string>, bool> _spawnPlanetaryInstallation;
+        Func<List<string>, MatrixD, Vector3, bool, string, string, bool> _customSpawnRequest;
         Action<Action<IMyCubeGrid>, bool> _registerSuccessfulSpawnAction;
 
         readonly Action<string> _log;
@@ -57,7 +58,6 @@ namespace ScenariumAPI.Integrations.MES
 
             try
             {
-                // MES responds to this by sending its delegate dictionary back to registered listeners.
                 MyAPIGateway.Utilities.SendModMessage(MesModId, "MESApiRequest");
                 LastStatus = "MES API request sent. Attempt " + RequestAttempts;
             }
@@ -96,6 +96,17 @@ namespace ScenariumAPI.Integrations.MES
             return _spawnPlanetaryInstallation.Invoke(coords, spawnGroups);
         }
 
+        public bool CustomSpawnRequest(List<string> spawnGroups, MatrixD spawningMatrix, Vector3 velocity, bool ignoreSafetyCheck, string factionOverride, string spawnProfileId)
+        {
+            if (!Ready || _customSpawnRequest == null)
+            {
+                Log("MES API is not ready. Cannot request custom spawn.");
+                return false;
+            }
+
+            return _customSpawnRequest.Invoke(spawnGroups, spawningMatrix, velocity, ignoreSafetyCheck, factionOverride, spawnProfileId);
+        }
+
         public void RegisterSuccessfulSpawnAction(Action<IMyCubeGrid> action, bool register)
         {
             if (!Ready || _registerSuccessfulSpawnAction == null)
@@ -122,6 +133,9 @@ namespace ScenariumAPI.Integrations.MES
 
                 if (dict.ContainsKey("SpawnPlanetaryInstallation"))
                     _spawnPlanetaryInstallation = (Func<Vector3D, List<string>, bool>)dict["SpawnPlanetaryInstallation"];
+
+                if (dict.ContainsKey("CustomSpawnRequest"))
+                    _customSpawnRequest = (Func<List<string>, MatrixD, Vector3, bool, string, string, bool>)dict["CustomSpawnRequest"];
 
                 if (dict.ContainsKey("RegisterSuccessfulSpawnAction"))
                     _registerSuccessfulSpawnAction = (Action<Action<IMyCubeGrid>, bool>)dict["RegisterSuccessfulSpawnAction"];
