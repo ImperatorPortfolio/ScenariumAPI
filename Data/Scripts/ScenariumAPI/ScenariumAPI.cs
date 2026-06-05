@@ -3,8 +3,10 @@ using Sandbox.Game;
 using VRage.Game.Components;
 using VRage.Input;
 using VRage.Utils;
+using VRage.Game.ModAPI;
 using System;
 using System.IO;
+using System.Collections.Generic;
 using ScenariumAPI.Loading;
 using ScenariumAPI.Validation;
 using ScenariumAPI.Runtime;
@@ -16,6 +18,7 @@ using ScenariumAPI.Events;
 using ScenariumAPI.Diagnostics;
 using ScenariumAPI.Progression;
 using ScenariumAPI.Binding;
+using ScenariumAPI.Objectives;
 
 namespace ScenariumAPI
 {
@@ -49,13 +52,17 @@ namespace ScenariumAPI
         TransitionAuditLog _transitionAudit;
         bool _ignorePersistedRuntimeStateOnce;
         ScenariumEntityBindingRuntime _entityBinding;
+        ObjectiveRuntime _objectives;
         bool _mesSpawnCallbackRegistered;
         int _autoSpawnCooldownTicks;
-        const int AutoSpawnRetryCooldownTicks = 3600;
+        const int AutoSpawnRetryCooldownTicks = 10800;
         string _autoSpawnPendingNodeId;
         string _autoSpawnPendingSpawnGroup;
         int _autoSpawnPendingTicks;
-        const int AutoSpawnPendingTimeoutTicks = 7200;
+        bool _autoSpawnSessionLock;
+        int _autoSpawnSessionLockTicks;
+        const int AutoSpawnSessionLockTimeoutTicks = 18000;
+        const int AutoSpawnPendingTimeoutTicks = 18000;
 
         public override void LoadData()
         {
@@ -74,6 +81,7 @@ namespace ScenariumAPI
             _queryApi = new ScenariumQueryApi(_runtime);
             _nodeDetection = new NodeDetectionRuntime(_runtime, AddEvent);
             _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
+            _objectives = new ObjectiveRuntime(RunValidatedNodeTransition, AddEvent);
             _mesBridge = new MesBindingBridge(_runtime, AddEvent);
             _mesExporter = new MesPermissionExporter(AddEvent);
             _mesSpawnRequests = new MesSpawnRequestRuntime(_runtime, _mesBridge, AddEvent);
@@ -125,6 +133,7 @@ namespace ScenariumAPI
                     AddEvent("Persisted runtime state restored.");
                 }
 
+                RefreshObjectiveBindingsFromCampaign();
                 TryAutoSpawnNextObjective("campaign load");
             }
 
@@ -134,6 +143,20 @@ namespace ScenariumAPI
 
             if (_autoSpawnCooldownTicks > 0)
                 _autoSpawnCooldownTicks--;
+
+            if (_autoSpawnSessionLock)
+            {
+                _autoSpawnSessionLockTicks++;
+
+                if (_autoSpawnSessionLockTicks > AutoSpawnSessionLockTimeoutTicks)
+                {
+                    AddEvent("Auto objective spawn session lock timed out. Spawn retry cooldown started.");
+                    _autoSpawnSessionLock = false;
+                    _autoSpawnSessionLockTicks = 0;
+                    ClearAutoSpawnPending();
+                    _autoSpawnCooldownTicks = AutoSpawnRetryCooldownTicks;
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(_autoSpawnPendingNodeId))
             {
@@ -161,19 +184,22 @@ namespace ScenariumAPI
                 UpdateHudViewModel();
             }
 
+            if (_objectives != null && _tick % 120 == 0)
+                _objectives.Update();
+
             if (_nodeDetection != null && _tick % 120 == 0)
             {
                 _nodeDetection.Update();
                 UpdateHudViewModel();
             }
 
-            if (_mesApi != null && _mesApi.Ready && _tick % 3600 == 0)
+            if (_mesApi != null && _mesApi.Ready && _tick % 7200 == 0)
                 TryAutoSpawnNextObjective("periodic update");
 
             if (_hud != null && _tick % 30 == 0)
                 _hud.Refresh(false);
 
-            if (_tick % 3600 == 0)
+            if (_tick % 7200 == 0)
                 SaveState();
         }
 
@@ -686,7 +712,7 @@ namespace ScenariumAPI
 
         bool HasAnyPendingAutoSpawn()
         {
-            return !string.IsNullOrWhiteSpace(_autoSpawnPendingNodeId);
+            return _autoSpawnSessionLock || !string.IsNullOrWhiteSpace(_autoSpawnPendingNodeId);
         }
 
         void MarkAutoSpawnPending(MesSpawnRequestData request)
@@ -699,6 +725,8 @@ namespace ScenariumAPI
             _autoSpawnPendingNodeId = request.NodeId;
             _autoSpawnPendingSpawnGroup = spawnGroup;
             _autoSpawnPendingTicks = 0;
+            _autoSpawnSessionLock = true;
+            _autoSpawnSessionLockTicks = 0;
         }
 
         void ClearAutoSpawnPending()
@@ -706,6 +734,84 @@ namespace ScenariumAPI
             _autoSpawnPendingNodeId = null;
             _autoSpawnPendingSpawnGroup = null;
             _autoSpawnPendingTicks = 0;
+            _autoSpawnSessionLock = false;
+            _autoSpawnSessionLockTicks = 0;
+        }
+
+        bool LiveGridAlreadyExistsForRequest(MesSpawnRequestData request)
+        {
+            if (request == null)
+                return false;
+
+            string spawnGroup = !string.IsNullOrWhiteSpace(request.SpawnGroup) ? request.SpawnGroup : request.EncounterTag;
+
+            if (string.IsNullOrWhiteSpace(spawnGroup))
+                return false;
+
+            HashSet<IMyEntity> entities = new HashSet<IMyEntity>();
+            MyAPIGateway.Entities.GetEntities(entities, entity => entity is IMyCubeGrid);
+
+            foreach (IMyEntity entity in entities)
+            {
+                IMyCubeGrid grid = entity as IMyCubeGrid;
+
+                if (grid == null)
+                    continue;
+
+                string name = grid.DisplayName ?? "";
+
+                if (name.IndexOf(spawnGroup, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+
+                if (!string.IsNullOrWhiteSpace(request.NodeId) &&
+                    name.IndexOf(request.NodeId, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+
+                if (name.IndexOf("Military Outpost", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    spawnGroup.IndexOf("Outpost", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+
+                if (name.IndexOf("Regional Base", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    spawnGroup.IndexOf("Regional", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+
+                if (name.IndexOf("Headquarters", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                    spawnGroup.IndexOf("Headquarters", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+
+        void RefreshObjectiveBindingsFromCampaign()
+        {
+            if (_objectives == null)
+                _objectives = new ObjectiveRuntime(RunValidatedNodeTransition, AddEvent);
+
+            _objectives.Clear();
+
+            if (_mesSpawnRequests == null)
+                return;
+
+            _mesSpawnRequests.Refresh();
+
+            foreach (MesSpawnRequestData request in _mesSpawnRequests.Store.Requests)
+            {
+                if (request == null || string.IsNullOrWhiteSpace(request.NodeId))
+                    continue;
+
+                ObjectiveData objective = new ObjectiveData();
+                objective.NodeId = request.NodeId;
+                objective.ObjectiveId = request.NodeId + "_CONTROL";
+                objective.ObjectiveType = "ControlBlockDestroyed";
+                objective.TargetBlockName = "SCENARIUM_OBJECTIVE_CONTROL";
+                objective.OnCompleteTransition = "destroyed";
+                objective.Required = true;
+                _objectives.AddObjective(objective);
+            }
+
+            AddEvent("Objective bindings refreshed from campaign MES nodes.");
         }
 
         void TryAutoSpawnNextObjective(string reason)
@@ -754,6 +860,13 @@ namespace ScenariumAPI
 
                 if (_mesSpawnBridge.HasPendingForNode(request.NodeId))
                     return;
+
+                if (LiveGridAlreadyExistsForRequest(request))
+                {
+                    AddEvent("Auto objective spawn skipped; live grid already exists for " + request.NodeId);
+                    _autoSpawnCooldownTicks = AutoSpawnRetryCooldownTicks;
+                    return;
+                }
 
                 MarkAutoSpawnPending(request);
                 bool spawned = _mesSpawnBridge.Request(request);
@@ -810,6 +923,10 @@ namespace ScenariumAPI
                 _entityBinding = new ScenariumEntityBindingRuntime(_runtime, AddEvent, RunValidatedNodeTransition);
 
             _entityBinding.BindFromMesSpawn(grid.EntityId, pending.NodeId, pending.SpawnGroup, grid.DisplayName);
+
+            if (_objectives != null)
+                _objectives.BindSpawnedGrid(pending.NodeId, grid);
+
             pending.Consumed = true;
             ClearAutoSpawnPending();
             _autoSpawnCooldownTicks = 0;
@@ -1205,6 +1322,7 @@ namespace ScenariumAPI
                 _hud.Refresh(true);
             }
 
+            RefreshObjectiveBindingsFromCampaign();
             TryAutoSpawnNextObjective("reset");
 
             SaveState();
