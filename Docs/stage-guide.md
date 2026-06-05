@@ -1,37 +1,12 @@
-# ScenariumAPI Stage Guide
+# Scenarium Stage Guide
 
-## 1. Core cleanup
-Clean `ScenariumAPI.cs`, remove duplicated initialization, normalize constructors, and keep HUD files out of backend updates.
-
-## 2. Functional MES spawn request runtime
-Scenarium creates real spawn permission/request state from campaign data automatically on load, reset, and node transition.
-
-## 3. SolarFrontier campaign data pass
-Campaign pack defines objective spawn policies: node -> MES spawn group -> allowed state.
-
-## 4. UTD NPC pack spawn wiring
-Add valid MES objective spawn groups using real UTD prefabs: `UTD_MilitaryOutpost`, `UTD_RegionalBase`, `UTD_Headquarters`.
-
-## 5. MES-controlled spawning
-MES naturally spawns only currently allowed objective groups. Manual spawning is not the main workflow.
-
-## 6. Entity binding after spawn
-Scenarium binds spawned grids by EntityId/spawn identity, not CustomData.
-
-## 7. Gameplay transition loop
-Destroy/capture spawned objective -> Scenarium validates transition -> applies consequences -> reveals next node -> refreshes MES permissions.
-
-## 8. Quest/objective runtime
-Node events complete objectives, advance quests, and unlock next campaign steps.
-
-## 9. Reward/world-fact runtime
-Rewards, world facts, unlocks, faction state changes, and MES enable/disable effects become data-driven.
-
-## 10. Persistence hardening
-Persist campaign state, quest state, entity bindings, world facts, rewards, and migration/version info safely.
-
-## 11. Admin tools after functionality
-Add diagnostics, help, and reporting after the actual gameplay loop works.
-
-## 12. HUD v2 last
-Improve UI once backend data is stable. HUD updates should be HUD-only packages unless explicitly combined.
+1. Core cleanup: keep ScenariumAPI generic and keep HUD updates isolated.
+2. Campaign authority: campaign packs define nodes, spawn bindings, unlocks, objectives, and rewards.
+3. NPC assets: NPC packs provide MES spawn groups, prefabs, factions, behaviours, and spawn compatibility only.
+4. Automatic objective spawning: Scenarium reads campaign state and asks MES to spawn the next allowed objective.
+5. Automatic spawn binding: Scenarium binds MES successful-spawn grids to campaign nodes using pending campaign requests.
+6. Gameplay loop: destroy/capture objective -> Scenarium validates transition -> campaign consequences reveal next objective.
+7. Quest/objective runtime: campaign data drives quest progress from node/world events.
+8. Reward/world-fact runtime: data-driven rewards, facts, faction state, and unlocks.
+9. Persistence hardening: persist campaign state, bindings, facts, quests, rewards, and migration metadata.
+10. HUD v2: improve UI after backend data is stable; HUD packages stay UI-only.
